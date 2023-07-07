@@ -1,0 +1,13 @@
+[package]
+name = "query-string-builder"
+description = "A query string builder for percent encoding key-value pairs"
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/sunsided/query-string-builder"
+keywords = ["url", "query-string", "query-argument"]
+categories = ["web-programming::http-client"]
+readme = "README.md"
+license-file = "LICENSE.md"
+
+[dependencies]
+percent-encoding = "2.3.0"

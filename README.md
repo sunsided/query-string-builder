@@ -1,0 +1,21 @@
+# A query string builder for percent encoding key-value pairs
+
+This is a tiny helper crate for simplifying the construction of URL query strings.
+The initial `?` question mark is automatically prepended.
+
+## Example
+
+```rust
+use query_string_builder::QueryString;
+
+fn main() {
+    let qs = QueryString::new()
+        .with_value("q", "apple")
+        .with_value("category", "fruits and vegetables");
+
+    assert_eq!(
+        format!("https://example.com/{qs}"),
+        "https://example.com/?q=apple&category=fruits%20and%20vegetables"
+    );
+}
+```
