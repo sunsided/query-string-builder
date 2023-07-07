@@ -9,12 +9,13 @@
 //! use query_string_builder::QueryString;
 //!
 //! let qs = QueryString::new()
-//!             .with_value("q", "apple")
-//!             .with_value("category", "fruits and vegetables");
+//!             .with_value("q", "🍎 apple")
+//!             .with_opt_value("color", None)
+//!             .with_opt_value("category", Some("fruits and vegetables?"));
 //!
 //! assert_eq!(
-//!     format!("https://example.com/{qs}"),
-//!     "https://example.com/?q=apple&category=fruits%20and%20vegetables"
+//!     format!("example.com/{qs}"),
+//!     "example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables?"
 //! );
 //! ```
 
@@ -56,15 +57,94 @@ impl<'a> QueryString<'a> {
     }
 
     /// Appends a key-value pair to the query string.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryString;
+    ///
+    /// let qs = QueryString::new()
+    ///             .with_value("q", "🍎 apple")
+    ///             .with_value("category", "fruits and vegetables");
+    ///
+    /// assert_eq!(
+    ///     format!("https://example.com/{qs}"),
+    ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables"
+    /// );
+    /// ```
     pub fn with_value(mut self, key: &'a str, value: &'a str) -> Self {
         self.pairs.push(Kvp { key, value });
         self
     }
 
+    /// Appends a key-value pair to the query string if the value exists.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryString;
+    ///
+    /// let qs = QueryString::new()
+    ///             .with_opt_value("q", Some("🍎 apple"))
+    ///             .with_opt_value("f", None)
+    ///             .with_opt_value("category", Some("fruits and vegetables"));
+    ///
+    /// assert_eq!(
+    ///     format!("https://example.com/{qs}"),
+    ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables"
+    /// );
+    /// ```
+    pub fn with_opt_value(self, key: &'a str, value: Option<&'a str>) -> Self {
+        if let Some(value) = value {
+            self.with_value(key, value)
+        } else {
+            self
+        }
+    }
+
     /// Appends a key-value pair to the query string.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryString;
+    ///
+    /// let mut qs = QueryString::new();
+    /// qs.push("q", "apple");
+    /// qs.push("category", "fruits and vegetables");
+    ///
+    /// assert_eq!(
+    ///     format!("https://example.com/{qs}"),
+    ///     "https://example.com/?q=apple&category=fruits%20and%20vegetables"
+    /// );
+    /// ```
     pub fn push(&mut self, key: &'a str, value: &'a str) -> &Self {
         self.pairs.push(Kvp { key, value });
         self
+    }
+
+    /// Appends a key-value pair to the query string if the value exists.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryString;
+    ///
+    /// let mut qs = QueryString::new();
+    /// qs.push_opt("q", None);
+    /// qs.push_opt("q", Some("🍎 apple"));
+    ///
+    /// assert_eq!(
+    ///     format!("https://example.com/{qs}"),
+    ///     "https://example.com/?q=%F0%9F%8D%8E%20apple"
+    /// );
+    /// ```
+    pub fn push_opt(&mut self, key: &'a str, value: Option<&'a str>) -> &Self {
+        if let Some(value) = value {
+            self.push(key, value)
+        } else {
+            self
+        }
     }
 
     /// Determines the number of key-value pairs currently in the builder.
@@ -113,11 +193,11 @@ mod tests {
     #[test]
     fn test_simple() {
         let qs = QueryString::new()
-            .with_value("q", "apple")
+            .with_value("q", "apple???")
             .with_value("category", "fruits and vegetables");
         assert_eq!(
             qs.to_string(),
-            "?q=apple&category=fruits%20and%20vegetables"
+            "?q=apple???&category=fruits%20and%20vegetables"
         );
     }
 
@@ -137,6 +217,18 @@ mod tests {
         assert_eq!(
             qs.to_string(),
             "?q=%F0%9F%A5%A6&%F0%9F%8D%BD%EF%B8%8F=%F0%9F%8D%94%F0%9F%8D%95"
+        );
+    }
+
+    #[test]
+    fn test_optional() {
+        let qs = QueryString::new()
+            .with_value("q", "celery")
+            .with_opt_value("taste", None)
+            .with_opt_value("category", Some("fruits and vegetables"));
+        assert_eq!(
+            qs.to_string(),
+            "?q=celery&category=fruits%20and%20vegetables"
         );
     }
 }

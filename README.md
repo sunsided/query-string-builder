@@ -11,11 +11,12 @@ use query_string_builder::QueryString;
 fn main() {
     let qs = QueryString::new()
         .with_value("q", "apple")
-        .with_value("category", "fruits and vegetables");
+        .with_opt_value("color", None)
+        .with_opt_value("category", Some("fruits and vegetables?"));
 
     assert_eq!(
         format!("https://example.com/{qs}"),
-        "https://example.com/?q=apple&category=fruits%20and%20vegetables"
+        "https://example.com/?q=apple&category=fruits%20and%20vegetables?"
     );
 }
 ```
