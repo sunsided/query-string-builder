@@ -1,6 +1,7 @@
 [package]
 name = "query-string-builder"
 description = "A query string builder for percent encoding key-value pairs"
+authors = ["Markus Mayer"]
 version = "0.2.0"
 edition = "2021"
 repository = "https://github.com/sunsided/query-string-builder"
