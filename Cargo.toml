@@ -2,13 +2,13 @@
 name = "query-string-builder"
 description = "A query string builder for percent encoding key-value pairs"
 authors = ["Markus Mayer"]
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 repository = "https://github.com/sunsided/query-string-builder"
 keywords = ["url", "query-string", "query-argument"]
 categories = ["web-programming::http-client"]
 readme = "README.md"
-license-file = "LICENSE.md"
+license = "EUPL-1.2"
 
 [dependencies]
 percent-encoding = { version = "2.3.0", default-features = false, features = ["std"] }
