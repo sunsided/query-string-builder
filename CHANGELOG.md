@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2023-07-08
+
+### Added
+
+- The `QueryBuilder` now owns all string values, making it easier to pass
+  a `QueryBuilder` value out of a function.
+
 ## [0.3.0] - 2023-07-08
 
 ### Added

@@ -10,7 +10,7 @@
 //!
 //! let qs = QueryString::new()
 //!             .with_value("q", "🍎 apple")
-//!             .with_opt_value("color", None)
+//!             .with_opt_value("color", None::<String>)
 //!             .with_opt_value("category", Some("fruits and vegetables?"));
 //!
 //! assert_eq!(
@@ -44,11 +44,11 @@ const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').ad
 /// );
 /// ```
 #[derive(Debug, Default, Clone)]
-pub struct QueryString<'a> {
-    pairs: Vec<Kvp<'a>>,
+pub struct QueryString {
+    pairs: Vec<Kvp>,
 }
 
-impl<'a> QueryString<'a> {
+impl QueryString {
     /// Creates a new, empty query string builder.
     pub fn new() -> Self {
         Self {
@@ -72,8 +72,11 @@ impl<'a> QueryString<'a> {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables"
     /// );
     /// ```
-    pub fn with_value(mut self, key: &'a str, value: &'a str) -> Self {
-        self.pairs.push(Kvp { key, value });
+    pub fn with_value<K: Into<String>, V: Into<String>>(mut self, key: K, value: V) -> Self {
+        self.pairs.push(Kvp {
+            key: key.into(),
+            value: value.into(),
+        });
         self
     }
 
@@ -86,7 +89,7 @@ impl<'a> QueryString<'a> {
     ///
     /// let qs = QueryString::new()
     ///             .with_opt_value("q", Some("🍎 apple"))
-    ///             .with_opt_value("f", None)
+    ///             .with_opt_value("f", None::<String>)
     ///             .with_opt_value("category", Some("fruits and vegetables"));
     ///
     /// assert_eq!(
@@ -94,7 +97,11 @@ impl<'a> QueryString<'a> {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables"
     /// );
     /// ```
-    pub fn with_opt_value(self, key: &'a str, value: Option<&'a str>) -> Self {
+    pub fn with_opt_value<K: Into<String>, V: Into<String>>(
+        self,
+        key: K,
+        value: Option<V>,
+    ) -> Self {
         if let Some(value) = value {
             self.with_value(key, value)
         } else {
@@ -118,8 +125,11 @@ impl<'a> QueryString<'a> {
     ///     "https://example.com/?q=apple&category=fruits%20and%20vegetables"
     /// );
     /// ```
-    pub fn push(&mut self, key: &'a str, value: &'a str) -> &Self {
-        self.pairs.push(Kvp { key, value });
+    pub fn push<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) -> &Self {
+        self.pairs.push(Kvp {
+            key: key.into(),
+            value: value.into(),
+        });
         self
     }
 
@@ -131,7 +141,7 @@ impl<'a> QueryString<'a> {
     /// use query_string_builder::QueryString;
     ///
     /// let mut qs = QueryString::new();
-    /// qs.push_opt("q", None);
+    /// qs.push_opt("q", None::<String>);
     /// qs.push_opt("q", Some("🍎 apple"));
     ///
     /// assert_eq!(
@@ -139,7 +149,11 @@ impl<'a> QueryString<'a> {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple"
     /// );
     /// ```
-    pub fn push_opt(&mut self, key: &'a str, value: Option<&'a str>) -> &Self {
+    pub fn push_opt<K: Into<String>, V: Into<String>>(
+        &mut self,
+        key: K,
+        value: Option<V>,
+    ) -> &Self {
         if let Some(value) = value {
             self.push(key, value)
         } else {
@@ -174,7 +188,7 @@ impl<'a> QueryString<'a> {
     ///     "https://example.com/?q=apple&q=pear"
     /// );
     /// ```
-    pub fn append(&mut self, mut other: QueryString<'a>) {
+    pub fn append(&mut self, mut other: QueryString) {
         self.pairs.append(&mut other.pairs)
     }
 
@@ -195,13 +209,13 @@ impl<'a> QueryString<'a> {
     ///     "https://example.com/?q=apple&q=pear"
     /// );
     /// ```
-    pub fn append_into(mut self, mut other: QueryString<'a>) -> Self {
+    pub fn append_into(mut self, mut other: QueryString) -> Self {
         self.pairs.append(&mut other.pairs);
         self
     }
 }
 
-impl<'a> Display for QueryString<'a> {
+impl Display for QueryString {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.pairs.is_empty() {
             return Ok(());
@@ -214,8 +228,8 @@ impl<'a> Display for QueryString<'a> {
                 write!(
                     f,
                     "{key}={value}",
-                    key = utf8_percent_encode(pair.key, FRAGMENT),
-                    value = utf8_percent_encode(pair.value, FRAGMENT)
+                    key = utf8_percent_encode(&pair.key, FRAGMENT),
+                    value = utf8_percent_encode(&pair.value, FRAGMENT)
                 )?;
             }
             Ok(())
@@ -224,9 +238,9 @@ impl<'a> Display for QueryString<'a> {
 }
 
 #[derive(Debug, Clone)]
-struct Kvp<'a> {
-    key: &'a str,
-    value: &'a str,
+struct Kvp {
+    key: String,
+    value: String,
 }
 
 #[cfg(test)]
@@ -267,7 +281,7 @@ mod tests {
     fn test_optional() {
         let qs = QueryString::new()
             .with_value("q", "celery")
-            .with_opt_value("taste", None)
+            .with_opt_value("taste", None::<String>)
             .with_opt_value("category", Some("fruits and vegetables"));
         assert_eq!(
             qs.to_string(),
