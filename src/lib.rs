@@ -156,6 +156,49 @@ impl<'a> QueryString<'a> {
     pub fn is_empty(&self) -> bool {
         self.pairs.is_empty()
     }
+
+    /// Appends another query string builder's values.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryString;
+    ///
+    /// let mut qs = QueryString::new().with_value("q", "apple");
+    /// let more = QueryString::new().with_value("q", "pear");
+    ///
+    /// qs.append(more);
+    ///
+    /// assert_eq!(
+    ///     format!("https://example.com/{qs}"),
+    ///     "https://example.com/?q=apple&q=pear"
+    /// );
+    /// ```
+    pub fn append(&mut self, mut other: QueryString<'a>) {
+        self.pairs.append(&mut other.pairs)
+    }
+
+    /// Appends another query string builder's values, consuming both types.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryString;
+    ///
+    /// let qs = QueryString::new().with_value("q", "apple");
+    /// let more = QueryString::new().with_value("q", "pear");
+    ///
+    /// let qs = qs.append_into(more);
+    ///
+    /// assert_eq!(
+    ///     format!("https://example.com/{qs}"),
+    ///     "https://example.com/?q=apple&q=pear"
+    /// );
+    /// ```
+    pub fn append_into(mut self, mut other: QueryString<'a>) -> Self {
+        self.pairs.append(&mut other.pairs);
+        self
+    }
 }
 
 impl<'a> Display for QueryString<'a> {
