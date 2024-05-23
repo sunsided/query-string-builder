@@ -10,12 +10,13 @@
 //!
 //! let qs = QueryString::new()
 //!             .with_value("q", "🍎 apple")
+//!             .with_value("tasty", true)
 //!             .with_opt_value("color", None::<String>)
 //!             .with_opt_value("category", Some("fruits and vegetables?"));
 //!
 //! assert_eq!(
 //!     format!("example.com/{qs}"),
-//!     "example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables?"
+//!     "example.com/?q=%F0%9F%8D%8E%20apple&tasty=true&category=fruits%20and%20vegetables?"
 //! );
 //! ```
 
