@@ -255,12 +255,14 @@ mod tests {
     fn test_simple() {
         let qs = QueryString::new()
             .with_value("q", "apple???")
-            .with_value("category", "fruits and vegetables");
+            .with_value("category", "fruits and vegetables")
+            .with_value("tasty", true)
+            .with_value("weight", 99.9);
         assert_eq!(
             qs.to_string(),
-            "?q=apple???&category=fruits%20and%20vegetables"
+            "?q=apple???&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
         );
-        assert_eq!(qs.len(), 2);
+        assert_eq!(qs.len(), 4);
         assert!(!qs.is_empty());
     }
 
@@ -268,12 +270,8 @@ mod tests {
     fn test_encoding() {
         let qs = QueryString::new()
             .with_value("q", "Grünkohl")
-            .with_value("category", "Gemüse")
-            .with_value("answer", 42);
-        assert_eq!(
-            qs.to_string(),
-            "?q=Gr%C3%BCnkohl&category=Gem%C3%BCse&answer=42"
-        );
+            .with_value("category", "Gemüse");
+        assert_eq!(qs.to_string(), "?q=Gr%C3%BCnkohl&category=Gem%C3%BCse");
     }
 
     #[test]
@@ -292,12 +290,14 @@ mod tests {
         let qs = QueryString::new()
             .with_value("q", "celery")
             .with_opt_value("taste", None::<String>)
-            .with_opt_value("category", Some("fruits and vegetables"));
+            .with_opt_value("category", Some("fruits and vegetables"))
+            .with_opt_value("tasty", Some(true))
+            .with_opt_value("weight", Some(99.9));
         assert_eq!(
             qs.to_string(),
-            "?q=celery&category=fruits%20and%20vegetables"
+            "?q=celery&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
         );
-        assert_eq!(qs.len(), 2); // not three!
+        assert_eq!(qs.len(), 4); // not five!
     }
 
     #[test]
