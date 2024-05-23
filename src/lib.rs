@@ -26,7 +26,7 @@ use std::fmt::{Display, Formatter};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
+use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
@@ -309,9 +309,9 @@ impl Value {
     }
 
     pub fn lazy_fn<F, T>(func: F) -> Self
-        where
-            F: Fn() -> T + 'static,
-            T: ToString + 'static,
+    where
+        F: Fn() -> T + 'static,
+        T: ToString + 'static,
     {
         Value {
             value: Box::new(move || func().to_string()),
@@ -324,8 +324,8 @@ impl Value {
 }
 
 impl<T> From<Rc<T>> for Value
-    where
-        T: ToString + 'static,
+where
+    T: ToString + 'static,
 {
     fn from(value: Rc<T>) -> Self {
         Value::lazy_rc(value)
@@ -333,8 +333,8 @@ impl<T> From<Rc<T>> for Value
 }
 
 impl<T> From<Arc<T>> for Value
-    where
-        T: ToString + 'static,
+where
+    T: ToString + 'static,
 {
     fn from(value: Arc<T>) -> Self {
         Value::lazy_arc(value)
@@ -342,9 +342,9 @@ impl<T> From<Arc<T>> for Value
 }
 
 impl<F, T> From<F> for Value
-    where
-        F: Fn() -> T + 'static,
-        T: ToString + 'static,
+where
+    F: Fn() -> T + 'static,
+    T: ToString + 'static,
 {
     fn from(value: F) -> Self {
         Value::lazy_fn(value)
