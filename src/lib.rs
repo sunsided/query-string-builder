@@ -23,10 +23,16 @@
 
 use std::fmt::{Debug, Display, Formatter};
 
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 
-/// https://url.spec.whatwg.org/#fragment-percent-encode-set
-const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
+/// https://url.spec.whatwg.org/#query-percent-encode-set
+const QUERY: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'#').add(b'<').add(b'>')
+    // The following values are not strictly required by RFC 3986 but could help resolving recursion
+    // where a URL is passed as a value. In these cases, occurrences of equal signs and ampersands
+    // could break parsing.
+    // By a similar logic, encoding the percent sign helps to resolve ambiguity.
+    // The plus sign is also added to the set as to not confuse it with a space.
+    .add(b'%').add(b'&').add(b'=').add(b'+');
 
 /// A query string builder for percent encoding key-value pairs.
 ///
@@ -229,8 +235,8 @@ impl Display for QueryString {
                 write!(
                     f,
                     "{key}={value}",
-                    key = utf8_percent_encode(&pair.key, FRAGMENT),
-                    value = utf8_percent_encode(&pair.value, FRAGMENT)
+                    key = utf8_percent_encode(&pair.key, QUERY),
+                    value = utf8_percent_encode(&pair.value, QUERY)
                 )?;
             }
             Ok(())
@@ -326,5 +332,55 @@ mod tests {
             format!("https://example.com/{qs}"),
             "https://example.com/?q=apple&q=pear&answer=42"
         );
+    }
+
+    #[test]
+    fn test_characters() {
+        let tests = vec![
+            ("space", " ", "%20"),
+            ("double_quote", "\"", "%22"),
+            ("hash", "#", "%23"),
+            ("less_than", "<", "%3C"),
+            ("equals", "=", "%3D"),
+            ("greater_than", ">", "%3E"),
+            ("percent", "%", "%25"),
+            ("ampersand", "&", "%26"),
+            ("plus", "+", "%2B"),
+            //
+            ("dollar", "$", "$"),
+            ("single_quote", "'", "'"),
+            ("comma", ",", ","),
+            ("forward_slash", "/", "/"),
+            ("colon", ":", ":"),
+            ("semicolon", ";", ";"),
+            ("question_mark", "?", "?"),
+            ("at", "@", "@"),
+            ("left_bracket", "[", "["),
+            ("backslash", "\\", "\\"),
+            ("right_bracket", "]", "]"),
+            ("caret", "^", "^"),
+            ("underscore", "_", "_"),
+            ("grave", "^", "^"),
+            ("left_curly", "{", "{"),
+            ("pipe", "|", "|"),
+            ("right_curly", "}", "}"),
+        ];
+
+        let mut qs = QueryString::new();
+        for (key, value, _) in &tests {
+            qs.push(key.to_string(), value.to_string());
+        }
+
+        let mut expected = String::new();
+        for (i, (key, _, value)) in tests.iter().enumerate() {
+            if i > 0 {
+                expected.push('&');
+            }
+            expected.push_str(&format!("{key}={value}"));
+        }
+
+        assert_eq!(
+            format!("https://example.com/{qs}"),
+            format!("https://example.com/?{expected}"));
     }
 }

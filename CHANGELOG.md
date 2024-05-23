@@ -3,6 +3,13 @@
 All notable changes to this project will be documented in this file.
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- More characters are added to the encoding set to ensure recursive values
+  (e.g. URLs as a value) decode reliably.
+
 ## [0.4.0] - 2023-07-08
 
 ### Added
@@ -29,5 +36,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 🎉 Initial release.
 
 [0.3.0]: https://github.com/sunsided/query-string-builder/releases/tag/0.3.0
+
 [0.2.0]: https://github.com/sunsided/query-string-builder/releases/tag/0.2.0
+
 [0.1.0]: https://github.com/sunsided/query-string-builder/releases/tag/0.1.0
