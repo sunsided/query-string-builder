@@ -22,8 +22,9 @@
 
 #![deny(unsafe_code)]
 
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use std::fmt::{Debug, Display, Formatter};
+
+use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
@@ -100,11 +101,7 @@ impl QueryString {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables&works=true"
     /// );
     /// ```
-    pub fn with_opt_value<K: ToString, V: ToString>(
-        self,
-        key: K,
-        value: Option<V>,
-    ) -> Self {
+    pub fn with_opt_value<K: ToString, V: ToString>(self, key: K, value: Option<V>) -> Self {
         if let Some(value) = value {
             self.with_value(key, value)
         } else {
@@ -152,11 +149,7 @@ impl QueryString {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple"
     /// );
     /// ```
-    pub fn push_opt<K: ToString, V: ToString>(
-        &mut self,
-        key: K,
-        value: Option<V>,
-    ) -> &Self {
+    pub fn push_opt<K: ToString, V: ToString>(&mut self, key: K, value: Option<V>) -> &Self {
         if let Some(value) = value {
             self.push(key, value)
         } else {
@@ -221,7 +214,7 @@ impl QueryString {
 impl Display for QueryString {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.pairs.is_empty() {
-            return Ok(());
+            Ok(())
         } else {
             write!(f, "?")?;
             for (i, pair) in self.pairs.iter().enumerate() {
@@ -251,6 +244,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_empty() {
+        let qs = QueryString::new();
+        assert_eq!(qs.to_string(), "");
+        assert_eq!(qs.len(), 0);
+        assert!(qs.is_empty());
+    }
+
+    #[test]
     fn test_simple() {
         let qs = QueryString::new()
             .with_value("q", "apple???")
@@ -259,6 +260,8 @@ mod tests {
             qs.to_string(),
             "?q=apple???&category=fruits%20and%20vegetables"
         );
+        assert_eq!(qs.len(), 2);
+        assert!(!qs.is_empty());
     }
 
     #[test]
@@ -267,7 +270,10 @@ mod tests {
             .with_value("q", "Grünkohl")
             .with_value("category", "Gemüse")
             .with_value("answer", 42);
-        assert_eq!(qs.to_string(), "?q=Gr%C3%BCnkohl&category=Gem%C3%BCse&answer=42");
+        assert_eq!(
+            qs.to_string(),
+            "?q=Gr%C3%BCnkohl&category=Gem%C3%BCse&answer=42"
+        );
     }
 
     #[test]
@@ -290,6 +296,34 @@ mod tests {
         assert_eq!(
             qs.to_string(),
             "?q=celery&category=fruits%20and%20vegetables"
+        );
+        assert_eq!(qs.len(), 2); // not three!
+    }
+
+    #[test]
+    fn test_push_optional() {
+        let mut qs = QueryString::new();
+        qs.push("a", "apple");
+        qs.push_opt("b", None::<String>);
+        qs.push_opt("c", Some("🍎 apple"));
+
+        assert_eq!(
+            format!("https://example.com/{qs}"),
+            "https://example.com/?a=apple&c=%F0%9F%8D%8E%20apple"
+        );
+    }
+
+    #[test]
+    fn test_append() {
+        let qs = QueryString::new().with_value("q", "apple");
+        let more = QueryString::new().with_value("q", "pear");
+
+        let mut qs = qs.append_into(more);
+        qs.append(QueryString::new().with_value("answer", "42"));
+
+        assert_eq!(
+            format!("https://example.com/{qs}"),
+            "https://example.com/?q=apple&q=pear&answer=42"
         );
     }
 }
