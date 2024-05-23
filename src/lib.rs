@@ -22,7 +22,9 @@
 
 #![deny(unsafe_code)]
 
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Display, Formatter};
+use std::rc::Rc;
+use std::sync::Arc;
 
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 
@@ -45,7 +47,7 @@ const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').ad
 ///     "https://example.com/?q=apple&category=fruits%20and%20vegetables"
 /// );
 /// ```
-#[derive(Debug, Default, Clone)]
+#[derive(Default)]
 pub struct QueryString {
     pairs: Vec<Kvp>,
 }
@@ -78,7 +80,33 @@ impl QueryString {
     pub fn with_value<K: ToString, V: ToString>(mut self, key: K, value: V) -> Self {
         self.pairs.push(Kvp {
             key: key.to_string(),
-            value: value.to_string(),
+            value: Value::eager(value),
+        });
+        self
+    }
+
+    /// Appends a key-value pair to the query string. Supports lazy evaluation.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use query_string_builder::{QueryString, Value};
+    ///
+    /// let qs = QueryString::new()
+    ///             .with("q", Value::eager("🍎 apple"))
+    ///             .with("category", || "fruits and vegetables")
+    ///             .with("answer", Arc::new(42));
+    ///
+    /// assert_eq!(
+    ///     format!("https://example.com/{qs}"),
+    ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables&answer=42"
+    /// );
+    /// ```
+    pub fn with<K: ToString, V: Into<Value>>(mut self, key: K, value: V) -> Self {
+        self.pairs.push(Kvp {
+            key: key.to_string(),
+            value: value.into(),
         });
         self
     }
@@ -128,7 +156,7 @@ impl QueryString {
     pub fn push<K: ToString, V: ToString>(&mut self, key: K, value: V) -> &Self {
         self.pairs.push(Kvp {
             key: key.to_string(),
-            value: value.to_string(),
+            value: Value::eager(value),
         });
         self
     }
@@ -221,11 +249,13 @@ impl Display for QueryString {
                 if i > 0 {
                     write!(f, "&")?;
                 }
+
+                let value = pair.value.render();
                 write!(
                     f,
                     "{key}={value}",
                     key = utf8_percent_encode(&pair.key, FRAGMENT),
-                    value = utf8_percent_encode(&pair.value, FRAGMENT)
+                    value = utf8_percent_encode(&value, FRAGMENT)
                 )?;
             }
             Ok(())
@@ -233,10 +263,88 @@ impl Display for QueryString {
     }
 }
 
-#[derive(Debug, Clone)]
 struct Kvp {
     key: String,
-    value: String,
+    value: Value,
+}
+
+pub struct Value {
+    value: Box<dyn Fn() -> String>,
+}
+
+impl Value {
+    pub fn eager<T: ToString>(value: T) -> Self {
+        let value = value.to_string();
+        Value {
+            value: Box::new(move || value.to_string()),
+        }
+    }
+
+    pub fn lazy<T: ToString + 'static>(value: T) -> Self {
+        Value {
+            value: Box::new(move || value.to_string()),
+        }
+    }
+
+    pub fn lazy_box<T: ToString + 'static>(value: Box<T>) -> Self {
+        Value {
+            value: Box::new(move || value.to_string()),
+        }
+    }
+
+    pub fn lazy_rc<T: ToString + 'static>(value: Rc<T>) -> Self {
+        Value {
+            value: Box::new(move || value.to_string()),
+        }
+    }
+
+    pub fn lazy_arc<T: ToString + 'static>(value: Arc<T>) -> Self {
+        Value {
+            value: Box::new(move || value.to_string()),
+        }
+    }
+
+    pub fn lazy_fn<F, T>(func: F) -> Self
+    where
+        F: Fn() -> T + 'static,
+        T: ToString + 'static,
+    {
+        Value {
+            value: Box::new(move || func().to_string()),
+        }
+    }
+
+    fn render(&self) -> String {
+        (self.value)()
+    }
+}
+
+impl<T> From<Rc<T>> for Value
+where
+    T: ToString + 'static,
+{
+    fn from(value: Rc<T>) -> Self {
+        Value::lazy_rc(value)
+    }
+}
+
+impl<T> From<Arc<T>> for Value
+where
+    T: ToString + 'static,
+{
+    fn from(value: Arc<T>) -> Self {
+        Value::lazy_arc(value)
+    }
+}
+
+impl<F, T> From<F> for Value
+where
+    F: Fn() -> T + 'static,
+    T: ToString + 'static,
+{
+    fn from(value: F) -> Self {
+        Value::lazy_fn(value)
+    }
 }
 
 #[cfg(test)]
@@ -264,6 +372,33 @@ mod tests {
         );
         assert_eq!(qs.len(), 4);
         assert!(!qs.is_empty());
+    }
+
+    #[test]
+    fn test_lazy() {
+        let qs = QueryString::new()
+            .with("x", Value::eager("y"))
+            .with("q", Value::lazy("apple???"))
+            .with("category", Value::lazy_fn(|| "fruits and vegetables"))
+            .with("tasty", Value::lazy_box(Box::new(true)))
+            .with("weight", Value::lazy_arc(Arc::new(99.9)));
+        assert_eq!(
+            qs.to_string(),
+            "?x=y&q=apple???&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
+        );
+    }
+
+    #[test]
+    fn test_lazy_implicit() {
+        let qs = QueryString::new()
+            .with("q", Value::lazy("apple???"))
+            .with("category", || "fruits and vegetables")
+            .with("tasty", Rc::new(true))
+            .with("weight", Arc::new(99.9));
+        assert_eq!(
+            qs.to_string(),
+            "?q=apple???&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
+        );
     }
 
     #[test]
