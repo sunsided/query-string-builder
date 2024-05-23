@@ -10,6 +10,10 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - More characters are added to the encoding set to ensure recursive values
   (e.g. URLs as a value) decode reliably.
 
+### Fixed
+
+- The hash character `#` is now encoded in order to ensure correct parsing of query parameters.
+
 ## [0.4.0] - 2023-07-08
 
 ### Added

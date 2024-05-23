@@ -23,16 +23,24 @@
 
 use std::fmt::{Debug, Display, Formatter};
 
-use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
+use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 
 /// https://url.spec.whatwg.org/#query-percent-encode-set
-const QUERY: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'#').add(b'<').add(b'>')
+const QUERY: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'<')
+    .add(b'>')
     // The following values are not strictly required by RFC 3986 but could help resolving recursion
     // where a URL is passed as a value. In these cases, occurrences of equal signs and ampersands
     // could break parsing.
     // By a similar logic, encoding the percent sign helps to resolve ambiguity.
     // The plus sign is also added to the set as to not confuse it with a space.
-    .add(b'%').add(b'&').add(b'=').add(b'+');
+    .add(b'%')
+    .add(b'&')
+    .add(b'=')
+    .add(b'+');
 
 /// A query string builder for percent encoding key-value pairs.
 ///
@@ -381,6 +389,7 @@ mod tests {
 
         assert_eq!(
             format!("https://example.com/{qs}"),
-            format!("https://example.com/?{expected}"));
+            format!("https://example.com/?{expected}")
+        );
     }
 }
