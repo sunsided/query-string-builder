@@ -1,5 +1,7 @@
 # A query string builder for percent encoding key-value pairs
 
+[![codecov](https://codecov.io/gh/sunsided/query-string-builder/graph/badge.svg?token=HUCXM04DOG)](https://codecov.io/gh/sunsided/query-string-builder)
+
 This is a tiny helper crate for simplifying the construction of URL query strings.
 The initial `?` question mark is automatically prepended.
 

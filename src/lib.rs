@@ -218,7 +218,7 @@ impl QueryString {
 impl Display for QueryString {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.pairs.is_empty() {
-            return Ok(());
+            Ok(())
         } else {
             write!(f, "?")?;
             for (i, pair) in self.pairs.iter().enumerate() {
