@@ -23,7 +23,7 @@
 
 use std::fmt::{Debug, Display, Formatter};
 
-use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
+use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
