@@ -65,17 +65,18 @@ impl QueryString {
     ///
     /// let qs = QueryString::new()
     ///             .with_value("q", "🍎 apple")
-    ///             .with_value("category", "fruits and vegetables");
+    ///             .with_value("category", "fruits and vegetables")
+    ///             .with_value("answer", 42);
     ///
     /// assert_eq!(
     ///     format!("https://example.com/{qs}"),
-    ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables"
+    ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables&answer=42"
     /// );
     /// ```
-    pub fn with_value<K: Into<String>, V: Into<String>>(mut self, key: K, value: V) -> Self {
+    pub fn with_value<K: ToString, V: ToString>(mut self, key: K, value: V) -> Self {
         self.pairs.push(Kvp {
-            key: key.into(),
-            value: value.into(),
+            key: key.to_string(),
+            value: value.to_string(),
         });
         self
     }
@@ -90,14 +91,15 @@ impl QueryString {
     /// let qs = QueryString::new()
     ///             .with_opt_value("q", Some("🍎 apple"))
     ///             .with_opt_value("f", None::<String>)
-    ///             .with_opt_value("category", Some("fruits and vegetables"));
+    ///             .with_opt_value("category", Some("fruits and vegetables"))
+    ///             .with_opt_value("works", Some(true));
     ///
     /// assert_eq!(
     ///     format!("https://example.com/{qs}"),
-    ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables"
+    ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables&works=true"
     /// );
     /// ```
-    pub fn with_opt_value<K: Into<String>, V: Into<String>>(
+    pub fn with_opt_value<K: ToString, V: ToString>(
         self,
         key: K,
         value: Option<V>,
@@ -125,10 +127,10 @@ impl QueryString {
     ///     "https://example.com/?q=apple&category=fruits%20and%20vegetables"
     /// );
     /// ```
-    pub fn push<K: Into<String>, V: Into<String>>(&mut self, key: K, value: V) -> &Self {
+    pub fn push<K: ToString, V: ToString>(&mut self, key: K, value: V) -> &Self {
         self.pairs.push(Kvp {
-            key: key.into(),
-            value: value.into(),
+            key: key.to_string(),
+            value: value.to_string(),
         });
         self
     }
@@ -149,7 +151,7 @@ impl QueryString {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple"
     /// );
     /// ```
-    pub fn push_opt<K: Into<String>, V: Into<String>>(
+    pub fn push_opt<K: ToString, V: ToString>(
         &mut self,
         key: K,
         value: Option<V>,
@@ -262,8 +264,9 @@ mod tests {
     fn test_encoding() {
         let qs = QueryString::new()
             .with_value("q", "Grünkohl")
-            .with_value("category", "Gemüse");
-        assert_eq!(qs.to_string(), "?q=Gr%C3%BCnkohl&category=Gem%C3%BCse");
+            .with_value("category", "Gemüse")
+            .with_value("answer", 42);
+        assert_eq!(qs.to_string(), "?q=Gr%C3%BCnkohl&category=Gem%C3%BCse&answer=42");
     }
 
     #[test]
