@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- [#3](https://github.com/sunsided/query-string-builder/pull/3):
+  The functions now change inputs that implement `ToString` rather than requiring `Into<String>`.
+  This allows for any `Display` types to be used directly.
+
 ## [0.4.0] - 2023-07-08
 
 ### Added
