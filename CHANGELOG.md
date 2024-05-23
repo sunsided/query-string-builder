@@ -11,6 +11,19 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The functions now change inputs that implement `ToString` rather than requiring `Into<String>`.
   This allows for any `Display` types to be used directly.
 
+## [0.4.2] - 2024-05-23
+
+[0.4.2]: https://github.com/sunsided/query-string-builder/releases/tag/v0.4.2
+
+### Added
+
+- More characters are added to the encoding set to ensure recursive values
+  (e.g. URLs as a value) decode reliably.
+
+### Fixed
+
+- The hash character `#` is now encoded in order to ensure correct parsing of query parameters.
+
 ## [0.4.0] - 2023-07-08
 
 ### Added
@@ -37,5 +50,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 🎉 Initial release.
 
 [0.3.0]: https://github.com/sunsided/query-string-builder/releases/tag/0.3.0
+
 [0.2.0]: https://github.com/sunsided/query-string-builder/releases/tag/0.2.0
+
 [0.1.0]: https://github.com/sunsided/query-string-builder/releases/tag/0.1.0
