@@ -21,8 +21,9 @@
 
 #![deny(unsafe_code)]
 
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 use std::fmt::{Debug, Display, Formatter};
+
+use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
@@ -248,6 +249,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_empty() {
+        let qs = QueryString::new();
+        assert_eq!(qs.to_string(), "");
+        assert_eq!(qs.len(), 0);
+        assert!(qs.is_empty());
+    }
+
+    #[test]
     fn test_simple() {
         let qs = QueryString::new()
             .with_value("q", "apple???")
@@ -256,6 +265,8 @@ mod tests {
             qs.to_string(),
             "?q=apple???&category=fruits%20and%20vegetables"
         );
+        assert_eq!(qs.len(), 2);
+        assert!(!qs.is_empty());
     }
 
     #[test]
@@ -286,6 +297,34 @@ mod tests {
         assert_eq!(
             qs.to_string(),
             "?q=celery&category=fruits%20and%20vegetables"
+        );
+        assert_eq!(qs.len(), 2); // not three!
+    }
+
+    #[test]
+    fn test_push_optional() {
+        let mut qs = QueryString::new();
+        qs.push("a", "apple");
+        qs.push_opt("b", None::<String>);
+        qs.push_opt("c", Some("🍎 apple"));
+
+        assert_eq!(
+            format!("https://example.com/{qs}"),
+            "https://example.com/?a=apple&c=%F0%9F%8D%8E%20apple"
+        );
+    }
+
+    #[test]
+    fn test_append() {
+        let qs = QueryString::new().with_value("q", "apple");
+        let more = QueryString::new().with_value("q", "pear");
+
+        let mut qs = qs.append_into(more);
+        qs.append(QueryString::new().with_value("answer", "42"));
+
+        assert_eq!(
+            format!("https://example.com/{qs}"),
+            "https://example.com/?q=apple&q=pear&answer=42"
         );
     }
 }
