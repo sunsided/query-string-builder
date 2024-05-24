@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, criterion_group, criterion_main};
 
 use query_string_builder::QueryString;
 
@@ -9,6 +9,17 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let qs = QueryString::new()
                 .with_value("q", "apple???")
                 .with_value("category", "fruits and vegetables");
+            format!("{qs}")
+        })
+    });
+
+    c.bench_function("with_value_more", |b| {
+        b.iter(|| {
+            let qs = QueryString::new()
+                .with_value("q", "apple???")
+                .with_value("category", "fruits and vegetables")
+                .with_value("tasty", true)
+                .with_value("weight", 99.9);
             format!("{qs}")
         })
     });
