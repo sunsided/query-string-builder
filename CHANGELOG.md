@@ -24,7 +24,17 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - The hash character `#` is now encoded in order to ensure correct parsing of query parameters.
 
+## [0.4.1] - 2023-07-08
+
+[0.4.1]: https://github.com/sunsided/query-string-builder/releases/tag/0.4.1
+
+### Internal
+
+- The license `EUPL-1.2` is now explicitly specified in `Cargo.toml`, allowing it to show up correctly on crates.io.
+
 ## [0.4.0] - 2023-07-08
+
+[0.4.0]: https://github.com/sunsided/query-string-builder/releases/tag/0.4.0
 
 ### Added
 
