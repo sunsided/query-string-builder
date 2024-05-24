@@ -339,14 +339,17 @@ impl<'a> From<Value<'a>> for QueryPart<'a> {
 
 impl<'a> Display for QueryPart<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let encode = |x| utf8_percent_encode(x, QUERY);
-        let mut write = |x| Display::fmt(&encode(x), f);
         match self {
-            QueryPart::Owned(b) => write(&b.to_string()),
-            QueryPart::Reference(b) => write(&b.to_string()),
-            QueryPart::RefStr(s) => write(s),
+            QueryPart::Owned(b) => write(&b.to_string(), f),
+            QueryPart::Reference(b) => write(&b.to_string(), f),
+            QueryPart::RefStr(s) => write(s, f),
         }
     }
+}
+
+#[inline(always)]
+fn write(x: &str, f: &mut Formatter<'_>) -> std::fmt::Result {
+    Display::fmt(&utf8_percent_encode(x, QUERY), f)
 }
 
 #[cfg(test)]
