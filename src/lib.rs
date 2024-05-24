@@ -24,7 +24,7 @@
 
 use std::fmt::{Display, Formatter, Write};
 
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const QUERY: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
@@ -254,40 +254,48 @@ pub struct Key<'a>(QueryPart<'a>);
 pub struct Value<'a>(QueryPart<'a>);
 
 impl<'a> Key<'a> {
+    #[inline(always)]
     pub fn from<T: ToString + 'static>(value: T) -> Self {
         Self(QueryPart::Owned(Box::new(value)))
     }
 
+    #[inline(always)]
     pub fn from_ref<T: ToString>(value: &'a T) -> Self {
         Self(QueryPart::Reference(value))
     }
 
+    #[inline(always)]
     pub fn from_str(key: &'a str) -> Key<'a> {
         Self(QueryPart::RefStr(key))
     }
 }
 
 impl<'a> Value<'a> {
+    #[inline(always)]
     pub fn from<T: ToString + 'static>(value: T) -> Self {
         Self(QueryPart::Owned(Box::new(value)))
     }
 
+    #[inline(always)]
     pub fn from_ref<T: ToString>(value: &'a T) -> Self {
         Self(QueryPart::Reference(value))
     }
 
+    #[inline(always)]
     pub fn from_str(value: &'a str) -> Self {
         Self(QueryPart::RefStr(&value))
     }
 }
 
 impl<'a> From<&'a str> for Key<'a> {
+    #[inline(always)]
     fn from(value: &'a str) -> Self {
         Self::from_str(value)
     }
 }
 
 impl<'a> From<&'a str> for Value<'a> {
+    #[inline(always)]
     fn from(value: &'a str) -> Self {
         Self::from_str(value)
     }
@@ -299,6 +307,7 @@ struct Kvp<'a> {
 }
 
 impl<'a> Kvp<'a> {
+    #[inline(always)]
     pub fn new<K: Into<QueryPart<'a>>, V: Into<QueryPart<'a>>>(key: K, value: V) -> Self {
         Self {
             key: key.into(),
@@ -315,12 +324,14 @@ enum QueryPart<'a> {
 }
 
 impl<'a> From<Key<'a>> for QueryPart<'a> {
+    #[inline(always)]
     fn from(value: Key<'a>) -> Self {
         value.0
     }
 }
 
 impl<'a> From<Value<'a>> for QueryPart<'a> {
+    #[inline(always)]
     fn from(value: Value<'a>) -> Self {
         value.0
     }
