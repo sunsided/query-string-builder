@@ -24,7 +24,7 @@
 
 use std::fmt::{Display, Formatter, Write};
 
-use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
+use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
 const QUERY: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
@@ -75,8 +75,13 @@ impl<'a> QueryString<'a> {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables&answer=42"
     /// );
     /// ```
-    pub fn with_value<K: ToString + 'static, V: ToString + 'static>(mut self, key: K, value: V) -> Self {
-        self.pairs.push(Kvp::new(QueryPart::from_tostring_value(key), QueryPart::from_tostring_value(value)));
+    pub fn with_value<K: ToString + 'static, V: ToString + 'static>(
+        mut self,
+        key: K,
+        value: V,
+    ) -> Self {
+        self.pairs
+            .push(Kvp::new(Key::from(key), Value::from(value)));
         self
     }
 
@@ -104,7 +109,11 @@ impl<'a> QueryString<'a> {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables&works=true"
     /// );
     /// ```
-    pub fn with_opt_value<K: ToString + 'static, V: ToString + 'static>(self, key: K, value: Option<V>) -> Self {
+    pub fn with_opt_value<K: ToString + 'static, V: ToString + 'static>(
+        self,
+        key: K,
+        value: Option<V>,
+    ) -> Self {
         if let Some(value) = value {
             self.with_value(key, value)
         } else {
@@ -128,8 +137,13 @@ impl<'a> QueryString<'a> {
     ///     "https://example.com/?q=apple&category=fruits%20and%20vegetables"
     /// );
     /// ```
-    pub fn push<K: ToString + 'static, V: ToString + 'static>(&mut self, key: K, value: V) -> &Self {
-        self.pairs.push(Kvp::new(Key::from(key), Value::from(value)));
+    pub fn push<K: ToString + 'static, V: ToString + 'static>(
+        &mut self,
+        key: K,
+        value: V,
+    ) -> &Self {
+        self.pairs
+            .push(Kvp::new(Key::from(key), Value::from(value)));
         self
     }
 
@@ -149,7 +163,11 @@ impl<'a> QueryString<'a> {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple"
     /// );
     /// ```
-    pub fn push_opt<K: ToString + 'static, V: ToString + 'static>(&mut self, key: K, value: Option<V>) -> &Self {
+    pub fn push_opt<K: ToString + 'static, V: ToString + 'static>(
+        &mut self,
+        key: K,
+        value: Option<V>,
+    ) -> &Self {
         if let Some(value) = value {
             self.push(key, value)
         } else {
@@ -282,7 +300,10 @@ struct Kvp<'a> {
 
 impl<'a> Kvp<'a> {
     pub fn new<K: Into<QueryPart<'a>>, V: Into<QueryPart<'a>>>(key: K, value: V) -> Self {
-        Self { key: key.into(), value: value.into() }
+        Self {
+            key: key.into(),
+            value: value.into(),
+        }
     }
 }
 
@@ -290,19 +311,7 @@ enum QueryPart<'a> {
     /// Captures a string reference.
     RefStr(&'a str),
     Owned(Box<dyn ToString>),
-    Borrowed(Box<&'a dyn ToString>),
     Reference(&'a dyn ToString),
-    DisplayFn(Box<dyn Fn(&mut Formatter) -> std::fmt::Result>),
-}
-
-impl<'a> QueryPart<'a> {
-    pub fn from_tostring_value<T: ToString + 'static>(text: T) -> Self {
-        Self::Owned(Box::new(text))
-    }
-
-    pub fn from_tostring_ref<T: ToString>(text: &'a T) -> Self {
-        Self::Reference(text)
-    }
 }
 
 impl<'a> From<Key<'a>> for QueryPart<'a> {
@@ -323,10 +332,8 @@ impl<'a> Display for QueryPart<'a> {
         let mut write = |x| Display::fmt(&encode(x), f);
         match self {
             QueryPart::Owned(b) => write(&b.to_string()),
-            QueryPart::Borrowed(b) => write(&b.to_string()),
             QueryPart::Reference(b) => write(&b.to_string()),
-            QueryPart::DisplayFn(b) => b(f),
-            QueryPart::RefStr(s) => write(s)
+            QueryPart::RefStr(s) => write(s),
         }
     }
 }
@@ -376,10 +383,7 @@ mod tests {
             .with("q", Value::from_str(&query))
             .with("owned", Value::from(complex))
             .with("borrowed", Value::from_ref(&complex_ref));
-        assert_eq!(
-            qs.to_string(),
-            "?q=apple???&owned=complex&borrowed=complex"
-        );
+        assert_eq!(qs.to_string(), "?q=apple???&owned=complex&borrowed=complex");
     }
 
     #[test]
