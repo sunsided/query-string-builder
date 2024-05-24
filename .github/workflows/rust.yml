@@ -43,7 +43,7 @@ jobs:
         features:
           - '--all-features'
           # - '--no-default-features'
-          - ''
+          # - ''
     steps:
       - uses: actions/checkout@v4
       - name: Build

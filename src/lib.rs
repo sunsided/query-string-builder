@@ -19,19 +19,14 @@
 //!     "example.com/?q=%F0%9F%8D%8E%20apple&tasty=true&category=fruits%20and%20vegetables?"
 //! );
 //! ```
-//!
-//! ## Crate features
-//!
-//! * `eager`: Percent-encodes the keys and values as soon as they are provided to the builder.
-//!            While this increases resource utilization when constructing, rendering / displaying
-//!            the final string becomes faster. If you only use a constructed query string once,
-//!            this option is likely not useful to you.
 
 #![deny(unsafe_code)]
 
+use std::borrow::Borrow;
 use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::{percent_encode, utf8_percent_encode, AsciiSet, CONTROLS};
 
 /// https://url.spec.whatwg.org/#query-percent-encode-set
 const QUERY: &AsciiSet = &CONTROLS
@@ -97,7 +92,13 @@ impl QueryString {
     /// );
     /// ```
     pub fn with_value<K: ToString, V: ToString>(mut self, key: K, value: V) -> Self {
-        self.pairs.push(Kvp::new(key, value));
+        self.pairs
+            .push(Kvp::new(Key::from(key), Value::from(value)));
+        self
+    }
+
+    pub fn with<K: Into<Key>, V: Into<Value>>(mut self, key: K, value: V) -> Self {
+        self.pairs.push(Kvp::new(key.into(), value.into()));
         self
     }
 
@@ -144,7 +145,8 @@ impl QueryString {
     /// );
     /// ```
     pub fn push<K: ToString, V: ToString>(&mut self, key: K, value: V) -> &Self {
-        self.pairs.push(Kvp::new(key, value));
+        self.pairs
+            .push(Kvp::new(Key::from(key), Value::from(value)));
         self
     }
 
@@ -237,7 +239,7 @@ impl Display for QueryString {
                     write!(f, "&")?;
                 }
 
-                write!(f, "{key}={value}", key = pair.key, value = pair.value)?;
+                write!(f, "{key}={value}", key = pair.key.0, value = pair.value.0)?;
             }
             Ok(())
         }
@@ -246,49 +248,116 @@ impl Display for QueryString {
 
 #[derive(Clone)]
 struct Kvp {
-    key: Text,
-    value: Text,
+    key: Key,
+    value: Value,
 }
 
 impl Kvp {
-    pub fn new<K: ToString, V: ToString>(key: K, value: V) -> Self {
-        let key = key.to_string();
-        let value = value.to_string();
+    pub fn new(key: Key, value: Value) -> Self {
+        Self { key, value }
+    }
+}
 
-        #[cfg(not(feature = "eager"))]
-        {
-            Self {
-                key: Text::Unformatted(key),
-                value: Text::Unformatted(value),
-            }
-        }
+#[derive(Clone)]
+pub struct Key(Text);
 
-        #[cfg(feature = "eager")]
-        {
-            Self {
-                key: Text::Formatted(utf8_percent_encode(&key, crate::QUERY).to_string()),
-                value: Text::Formatted(utf8_percent_encode(&value, crate::QUERY).to_string()),
-            }
-        }
+#[derive(Clone)]
+pub struct Value(Text);
+
+impl Key {
+    pub fn from<K: ToString>(key: K) -> Self {
+        Self(Text::Unformatted(key.to_string()))
+    }
+
+    pub fn from_eager<K: ToString>(key: K) -> Self {
+        Self(Text::Formatted(
+            utf8_percent_encode(&key.to_string(), QUERY).to_string(),
+        ))
+    }
+
+    pub fn from_str<K: Borrow<str>>(key: K) -> Self {
+        Self(Text::Formatted(
+            utf8_percent_encode(key.borrow(), QUERY).to_string(),
+        ))
+    }
+
+    pub fn from_raw_bytes<K: AsRef<[u8]>>(key: K) -> Self {
+        let key = key.as_ref();
+        Self(Text::Formatted(percent_encode(key, QUERY).to_string()))
+    }
+}
+
+impl Value {
+    pub fn from<V: ToString>(value: V) -> Self {
+        Self(Text::Unformatted(value.to_string()))
+    }
+
+    pub fn from_eager<V: ToString>(value: V) -> Self {
+        Self(Text::Formatted(
+            utf8_percent_encode(&value.to_string(), QUERY).to_string(),
+        ))
+    }
+
+    pub fn from_str<V: Borrow<str>>(value: V) -> Self {
+        Self(Text::Formatted(
+            utf8_percent_encode(value.borrow(), QUERY).to_string(),
+        ))
+    }
+
+    pub fn from_raw_bytes<V: AsRef<[u8]>>(value: V) -> Self {
+        let key = value.as_ref();
+        Self(Text::Formatted(percent_encode(key, QUERY).to_string()))
+    }
+}
+
+impl FromStr for Key {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Key::from_str(s))
+    }
+}
+
+impl FromStr for Value {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Value::from_str(s))
+    }
+}
+
+impl<T> From<T> for Key
+where
+    T: ToString,
+{
+    fn from(value: T) -> Self {
+        // TODO: If possible, specialize for &'static str
+        Key::from(value)
+    }
+}
+
+impl<T> From<T> for Value
+where
+    T: ToString,
+{
+    fn from(value: T) -> Self {
+        // TODO: If possible, specialize for &'static str
+        Value::from(value)
     }
 }
 
 #[derive(Clone)]
 enum Text {
     /// The text is kept as it was provided originally. Percent encoding is done when rendering.
-    #[cfg(not(feature = "eager"))]
     Unformatted(String),
     /// The text is already percent encoded and can be used as-is when rendering.
-    #[cfg(feature = "eager")]
     Formatted(String),
 }
 
 impl Display for Text {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            #[cfg(not(feature = "eager"))]
             Text::Unformatted(text) => write!(f, "{}", utf8_percent_encode(&text, QUERY)),
-            #[cfg(feature = "eager")]
             Text::Formatted(text) => write!(f, "{}", text),
         }
     }
@@ -319,6 +388,37 @@ mod tests {
         );
         assert_eq!(qs.len(), 4);
         assert!(!qs.is_empty());
+    }
+
+    #[test]
+    fn test_with_simple() {
+        let qs = QueryString::new()
+            .with("q", "apple???")
+            .with("category", "fruits and vegetables")
+            .with("tasty", true)
+            .with("weight", 99.9);
+        assert_eq!(
+            qs.to_string(),
+            "?q=apple???&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
+        );
+        assert_eq!(qs.len(), 4);
+        assert!(!qs.is_empty());
+    }
+
+    #[test]
+    fn test_with_explicit() {
+        let qs = QueryString::new()
+            .with(Key::from_str("q"), Value::from_str("apple???"))
+            .with(
+                Key::from_eager("category"),
+                Value::from_str("fruits and vegetables"),
+            )
+            .with(Key::from_raw_bytes("tasty".as_bytes()), Value::from(true))
+            .with(Key::from("weight"), Value::from_eager(99.9));
+        assert_eq!(
+            qs.to_string(),
+            "?q=apple???&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
+        );
     }
 
     #[test]
