@@ -236,9 +236,13 @@ impl Display for QueryString {
                     f.write_char('&')?;
                 }
 
-                utf8_percent_encode(&pair.key, QUERY).fmt(f)?;
+                let key = utf8_percent_encode(&pair.key, QUERY);
+                Display::fmt(&key, f)?;
+
                 f.write_char('=')?;
-                utf8_percent_encode(&pair.value, QUERY).fmt(f)?;
+
+                let value = utf8_percent_encode(&pair.value, QUERY);
+                Display::fmt(&value, f)?;
             }
             Ok(())
         }
