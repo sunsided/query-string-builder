@@ -22,7 +22,7 @@
 
 #![deny(unsafe_code)]
 
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Display, Formatter, Write};
 
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 
@@ -230,17 +230,15 @@ impl Display for QueryString {
         if self.pairs.is_empty() {
             Ok(())
         } else {
-            write!(f, "?")?;
+            f.write_char('?')?;
             for (i, pair) in self.pairs.iter().enumerate() {
                 if i > 0 {
-                    write!(f, "&")?;
+                    f.write_char('&')?;
                 }
-                write!(
-                    f,
-                    "{key}={value}",
-                    key = utf8_percent_encode(&pair.key, QUERY),
-                    value = utf8_percent_encode(&pair.value, QUERY)
-                )?;
+
+                utf8_percent_encode(&pair.key, QUERY).fmt(f)?;
+                f.write_char('=')?;
+                utf8_percent_encode(&pair.value, QUERY).fmt(f)?;
             }
             Ok(())
         }
