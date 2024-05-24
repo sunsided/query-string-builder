@@ -80,8 +80,9 @@ impl<'a> QueryString<'a> {
         self
     }
 
+    /// TODO: Provide documentation
     pub fn with<K: Into<Key<'a>>, V: Into<Value<'a>>>(mut self, key: K, value: V) -> Self {
-        self.pairs.push(Kvp::new(key.into().0, value.into().0));
+        self.pairs.push(Kvp::new(key.into(), value.into()));
         self
     }
 
@@ -128,7 +129,7 @@ impl<'a> QueryString<'a> {
     /// );
     /// ```
     pub fn push<K: ToString + 'static, V: ToString + 'static>(&mut self, key: K, value: V) -> &Self {
-        self.pairs.push(Kvp::new(QueryPart::from_tostring_value(key), QueryPart::from_tostring_value(value)));
+        self.pairs.push(Kvp::new(Key::from(key), Value::from(value)));
         self
     }
 
@@ -235,6 +236,14 @@ pub struct Key<'a>(QueryPart<'a>);
 pub struct Value<'a>(QueryPart<'a>);
 
 impl<'a> Key<'a> {
+    pub fn from<T: ToString + 'static>(value: T) -> Self {
+        Self(QueryPart::Owned(Box::new(value)))
+    }
+
+    pub fn from_ref<T: ToString>(value: &'a T) -> Self {
+        Self(QueryPart::Reference(value))
+    }
+
     pub fn from_str(key: &'a str) -> Key<'a> {
         Self(QueryPart::RefStr(key))
     }
@@ -243,6 +252,10 @@ impl<'a> Key<'a> {
 impl<'a> Value<'a> {
     pub fn from<T: ToString + 'static>(value: T) -> Self {
         Self(QueryPart::Owned(Box::new(value)))
+    }
+
+    pub fn from_ref<T: ToString>(value: &'a T) -> Self {
+        Self(QueryPart::Reference(value))
     }
 
     pub fn from_str(value: &'a str) -> Self {
@@ -277,6 +290,7 @@ enum QueryPart<'a> {
     /// Captures a string reference.
     RefStr(&'a str),
     Owned(Box<dyn ToString>),
+    Borrowed(Box<&'a dyn ToString>),
     Reference(&'a dyn ToString),
     DisplayFn(Box<dyn Fn(&mut Formatter) -> std::fmt::Result>),
 }
@@ -291,12 +305,25 @@ impl<'a> QueryPart<'a> {
     }
 }
 
+impl<'a> From<Key<'a>> for QueryPart<'a> {
+    fn from(value: Key<'a>) -> Self {
+        value.0
+    }
+}
+
+impl<'a> From<Value<'a>> for QueryPart<'a> {
+    fn from(value: Value<'a>) -> Self {
+        value.0
+    }
+}
+
 impl<'a> Display for QueryPart<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let encode = |x| utf8_percent_encode(x, QUERY);
         let mut write = |x| Display::fmt(&encode(x), f);
         match self {
             QueryPart::Owned(b) => write(&b.to_string()),
+            QueryPart::Borrowed(b) => write(&b.to_string()),
             QueryPart::Reference(b) => write(&b.to_string()),
             QueryPart::DisplayFn(b) => b(f),
             QueryPart::RefStr(s) => write(s)
@@ -343,13 +370,15 @@ mod tests {
         }
 
         let complex = Complex;
+        let complex_ref = Complex;
 
         let qs = QueryString::new()
             .with("q", Value::from_str(&query))
-            .with("owned", Value::from(complex));
+            .with("owned", Value::from(complex))
+            .with("borrowed", Value::from_ref(&complex_ref));
         assert_eq!(
             qs.to_string(),
-            "?q=apple???&owned=complex"
+            "?q=apple???&owned=complex&borrowed=complex"
         );
     }
 
