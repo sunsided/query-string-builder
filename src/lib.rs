@@ -250,14 +250,14 @@ impl<'a> Value<'a> {
     }
 }
 
-impl<'a> From<&'static str> for Key<'a> {
-    fn from(value: &'static str) -> Self {
+impl<'a> From<&'a str> for Key<'a> {
+    fn from(value: &'a str) -> Self {
         Self::from_str(value)
     }
 }
 
-impl<'a> From<&'static str> for Value<'a> {
-    fn from(value: &'static str) -> Self {
+impl<'a> From<&'a str> for Value<'a> {
+    fn from(value: &'a str) -> Self {
         Self::from_str(value)
     }
 }
