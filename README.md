@@ -16,12 +16,13 @@ fn main() {
     let qs = QueryString::new()
         .with_value("q", "apple")
         .with_value("tasty", true)
+        .with_value("weight", 70.0)
         .with_opt_value("color", None::<String>)
         .with_opt_value("category", Some("fruits and vegetables?"));
 
     assert_eq!(
         format!("https://example.com/{qs}"),
-        "https://example.com/?q=apple&tasty=true&category=fruits%20and%20vegetables?&tasty=true"
+        "https://example.com/?q=apple&tasty=true&weight=70.0&category=fruits%20and%20vegetables?&tasty=true"
     );
 }
 ```
