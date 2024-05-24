@@ -1,6 +1,6 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-use query_string_builder::QueryString;
+use query_string_builder::{Key, QueryString, Value};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     // `with_value` method benchmark
@@ -8,7 +8,36 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let qs = QueryString::new()
                 .with_value("q", "apple???")
-                .with_value("category", "fruits and vegetables");
+                .with_value("category", "fruits and vegetables")
+                .with_value("tasty", true)
+                .with_value("weight", 99.9);
+            format!("{qs}")
+        })
+    });
+
+    // `with` method benchmark
+    c.bench_function("with_implicit", |b| {
+        b.iter(|| {
+            let qs = QueryString::new()
+                .with("q", "apple???")
+                .with("category", "fruits and vegetables")
+                .with("tasty", true)
+                .with("weight", 99.9);
+            format!("{qs}")
+        })
+    });
+
+    // `with` method benchmark
+    c.bench_function("with_explicit", |b| {
+        b.iter(|| {
+            let qs = QueryString::new()
+                .with(Key::from_str("q"), Value::from_str("apple???"))
+                .with(
+                    Key::from_eager("category"),
+                    Value::from_str("fruits and vegetables"),
+                )
+                .with(Key::from_raw_bytes("tasty".as_bytes()), Value::from(true))
+                .with(Key::from("weight"), Value::from_eager(99.9));
             format!("{qs}")
         })
     });
@@ -39,6 +68,25 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
             format!("{qs}")
         })
+    });
+
+    // Test focusing on printing more often than creating.
+    c.bench_function("print_alot", |b| {
+        let qs = QueryString::new()
+            .with_value("q", "apple???")
+            .with_value("category", "fruits and vegetables");
+        b.iter(|| format!("{}", black_box(&qs)))
+    });
+
+    // Test focusing on printing more often than creating.
+    c.bench_function("print_alot_eager", |b| {
+        let qs = QueryString::new()
+            .with(Key::from_str("q"), Value::from_str("apple???"))
+            .with(
+                Key::from_str("category"),
+                Value::from_str("fruits and vegetables"),
+            );
+        b.iter(|| format!("{}", black_box(&qs)))
     });
 }
 

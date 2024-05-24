@@ -22,9 +22,11 @@
 
 #![deny(unsafe_code)]
 
-use std::fmt::{Debug, Display, Formatter};
+use std::borrow::Borrow;
+use std::fmt::{Display, Formatter};
+use std::str::FromStr;
 
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::{percent_encode, utf8_percent_encode, AsciiSet, CONTROLS};
 
 /// https://url.spec.whatwg.org/#query-percent-encode-set
 const QUERY: &AsciiSet = &CONTROLS
@@ -59,7 +61,7 @@ const QUERY: &AsciiSet = &CONTROLS
 ///     "https://example.com/?q=apple&category=fruits%20and%20vegetables"
 /// );
 /// ```
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct QueryString {
     pairs: Vec<Kvp>,
 }
@@ -90,10 +92,13 @@ impl QueryString {
     /// );
     /// ```
     pub fn with_value<K: ToString, V: ToString>(mut self, key: K, value: V) -> Self {
-        self.pairs.push(Kvp {
-            key: key.to_string(),
-            value: value.to_string(),
-        });
+        self.pairs
+            .push(Kvp::new(Key::from(key), Value::from(value)));
+        self
+    }
+
+    pub fn with<K: Into<Key>, V: Into<Value>>(mut self, key: K, value: V) -> Self {
+        self.pairs.push(Kvp::new(key.into(), value.into()));
         self
     }
 
@@ -140,10 +145,8 @@ impl QueryString {
     /// );
     /// ```
     pub fn push<K: ToString, V: ToString>(&mut self, key: K, value: V) -> &Self {
-        self.pairs.push(Kvp {
-            key: key.to_string(),
-            value: value.to_string(),
-        });
+        self.pairs
+            .push(Kvp::new(Key::from(key), Value::from(value)));
         self
     }
 
@@ -235,22 +238,129 @@ impl Display for QueryString {
                 if i > 0 {
                     write!(f, "&")?;
                 }
-                write!(
-                    f,
-                    "{key}={value}",
-                    key = utf8_percent_encode(&pair.key, QUERY),
-                    value = utf8_percent_encode(&pair.value, QUERY)
-                )?;
+
+                write!(f, "{key}={value}", key = pair.key.0, value = pair.value.0)?;
             }
             Ok(())
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct Kvp {
-    key: String,
-    value: String,
+    key: Key,
+    value: Value,
+}
+
+impl Kvp {
+    pub fn new(key: Key, value: Value) -> Self {
+        Self { key, value }
+    }
+}
+
+#[derive(Clone)]
+pub struct Key(Text);
+
+#[derive(Clone)]
+pub struct Value(Text);
+
+impl Key {
+    pub fn from<K: ToString>(key: K) -> Self {
+        Self(Text::Unformatted(key.to_string()))
+    }
+
+    pub fn from_eager<K: ToString>(key: K) -> Self {
+        Self(Text::Formatted(
+            utf8_percent_encode(&key.to_string(), QUERY).to_string(),
+        ))
+    }
+
+    pub fn from_str<K: Borrow<str>>(key: K) -> Self {
+        Self(Text::Formatted(
+            utf8_percent_encode(key.borrow(), QUERY).to_string(),
+        ))
+    }
+
+    pub fn from_raw_bytes<K: AsRef<[u8]>>(key: K) -> Self {
+        let key = key.as_ref();
+        Self(Text::Formatted(percent_encode(key, QUERY).to_string()))
+    }
+}
+
+impl Value {
+    pub fn from<V: ToString>(value: V) -> Self {
+        Self(Text::Unformatted(value.to_string()))
+    }
+
+    pub fn from_eager<V: ToString>(value: V) -> Self {
+        Self(Text::Formatted(
+            utf8_percent_encode(&value.to_string(), QUERY).to_string(),
+        ))
+    }
+
+    pub fn from_str<V: Borrow<str>>(value: V) -> Self {
+        Self(Text::Formatted(
+            utf8_percent_encode(value.borrow(), QUERY).to_string(),
+        ))
+    }
+
+    pub fn from_raw_bytes<V: AsRef<[u8]>>(value: V) -> Self {
+        let key = value.as_ref();
+        Self(Text::Formatted(percent_encode(key, QUERY).to_string()))
+    }
+}
+
+impl FromStr for Key {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Key::from_str(s))
+    }
+}
+
+impl FromStr for Value {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Value::from_str(s))
+    }
+}
+
+impl<T> From<T> for Key
+where
+    T: ToString,
+{
+    fn from(value: T) -> Self {
+        // TODO: If possible, specialize for &'static str
+        Key::from(value)
+    }
+}
+
+impl<T> From<T> for Value
+where
+    T: ToString,
+{
+    fn from(value: T) -> Self {
+        // TODO: If possible, specialize for &'static str
+        Value::from(value)
+    }
+}
+
+#[derive(Clone)]
+enum Text {
+    /// The text is kept as it was provided originally. Percent encoding is done when rendering.
+    Unformatted(String),
+    /// The text is already percent encoded and can be used as-is when rendering.
+    Formatted(String),
+}
+
+impl Display for Text {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Text::Unformatted(text) => write!(f, "{}", utf8_percent_encode(&text, QUERY)),
+            Text::Formatted(text) => write!(f, "{}", text),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -278,6 +388,37 @@ mod tests {
         );
         assert_eq!(qs.len(), 4);
         assert!(!qs.is_empty());
+    }
+
+    #[test]
+    fn test_with_simple() {
+        let qs = QueryString::new()
+            .with("q", "apple???")
+            .with("category", "fruits and vegetables")
+            .with("tasty", true)
+            .with("weight", 99.9);
+        assert_eq!(
+            qs.to_string(),
+            "?q=apple???&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
+        );
+        assert_eq!(qs.len(), 4);
+        assert!(!qs.is_empty());
+    }
+
+    #[test]
+    fn test_with_explicit() {
+        let qs = QueryString::new()
+            .with(Key::from_str("q"), Value::from_str("apple???"))
+            .with(
+                Key::from_eager("category"),
+                Value::from_str("fruits and vegetables"),
+            )
+            .with(Key::from_raw_bytes("tasty".as_bytes()), Value::from(true))
+            .with(Key::from("weight"), Value::from_eager(99.9));
+        assert_eq!(
+            qs.to_string(),
+            "?q=apple???&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
+        );
     }
 
     #[test]
