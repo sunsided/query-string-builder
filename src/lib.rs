@@ -76,7 +76,12 @@ impl<'a> QueryString<'a> {
     /// );
     /// ```
     pub fn with_value<K: ToString + 'static, V: ToString + 'static>(mut self, key: K, value: V) -> Self {
-        self.pairs.push(Kvp::new(QueryPart::from_tostring(key), QueryPart::from_tostring(value)));
+        self.pairs.push(Kvp::new(QueryPart::from_tostring_value(key), QueryPart::from_tostring_value(value)));
+        self
+    }
+
+    pub fn with<K: Into<Key<'a>>, V: Into<Value<'a>>>(mut self, key: K, value: V) -> Self {
+        self.pairs.push(Kvp::new(key.into().0, value.into().0));
         self
     }
 
@@ -123,7 +128,7 @@ impl<'a> QueryString<'a> {
     /// );
     /// ```
     pub fn push<K: ToString + 'static, V: ToString + 'static>(&mut self, key: K, value: V) -> &Self {
-        self.pairs.push(Kvp::new(QueryPart::from_tostring(key), QueryPart::from_tostring(value)));
+        self.pairs.push(Kvp::new(QueryPart::from_tostring_value(key), QueryPart::from_tostring_value(value)));
         self
     }
 
@@ -216,9 +221,9 @@ impl<'a> Display for QueryString<'a> {
                     f.write_char('&')?;
                 }
 
-                Display::fmt(&utf8_percent_encode(&pair.key.to_string(), QUERY), f)?;
+                Display::fmt(&pair.key, f)?;
                 f.write_char('=')?;
-                Display::fmt(&utf8_percent_encode(&pair.value.to_string(), QUERY), f)?;
+                Display::fmt(&pair.value, f)?;
             }
             Ok(())
         }
@@ -228,6 +233,34 @@ impl<'a> Display for QueryString<'a> {
 pub struct Key<'a>(QueryPart<'a>);
 
 pub struct Value<'a>(QueryPart<'a>);
+
+impl<'a> Key<'a> {
+    pub fn from_str(key: &'a str) -> Key<'a> {
+        Self(QueryPart::RefStr(key))
+    }
+}
+
+impl<'a> Value<'a> {
+    pub fn from<T: ToString + 'static>(value: T) -> Self {
+        Self(QueryPart::Owned(Box::new(value)))
+    }
+
+    pub fn from_str(value: &'a str) -> Self {
+        Self(QueryPart::RefStr(&value))
+    }
+}
+
+impl<'a> From<&'static str> for Key<'a> {
+    fn from(value: &'static str) -> Self {
+        Self::from_str(value)
+    }
+}
+
+impl<'a> From<&'static str> for Value<'a> {
+    fn from(value: &'static str) -> Self {
+        Self::from_str(value)
+    }
+}
 
 struct Kvp<'a> {
     key: QueryPart<'a>,
@@ -241,23 +274,32 @@ impl<'a> Kvp<'a> {
 }
 
 enum QueryPart<'a> {
+    /// Captures a string reference.
+    RefStr(&'a str),
     Owned(Box<dyn ToString>),
     Reference(&'a dyn ToString),
-    Boxed(Box<dyn Fn(&mut Formatter) -> std::fmt::Result>),
+    DisplayFn(Box<dyn Fn(&mut Formatter) -> std::fmt::Result>),
 }
 
 impl<'a> QueryPart<'a> {
-    pub fn from_tostring<T: ToString + 'static>(text: T) -> Self {
+    pub fn from_tostring_value<T: ToString + 'static>(text: T) -> Self {
         Self::Owned(Box::new(text))
+    }
+
+    pub fn from_tostring_ref<T: ToString>(text: &'a T) -> Self {
+        Self::Reference(text)
     }
 }
 
 impl<'a> Display for QueryPart<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let encode = |x| utf8_percent_encode(x, QUERY);
+        let mut write = |x| Display::fmt(&encode(x), f);
         match self {
-            QueryPart::Owned(b) => f.write_str(&b.to_string()),
-            QueryPart::Reference(b) => f.write_str(&b.to_string()),
-            QueryPart::Boxed(b) => b(f),
+            QueryPart::Owned(b) => write(&b.to_string()),
+            QueryPart::Reference(b) => write(&b.to_string()),
+            QueryPart::DisplayFn(b) => b(f),
+            QueryPart::RefStr(s) => write(s)
         }
     }
 }
@@ -287,6 +329,28 @@ mod tests {
         );
         assert_eq!(qs.len(), 4);
         assert!(!qs.is_empty());
+    }
+
+    #[test]
+    fn test_deferred() {
+        let query = String::from("apple???");
+
+        struct Complex;
+        impl Display for Complex {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                write!(f, "complex")
+            }
+        }
+
+        let complex = Complex;
+
+        let qs = QueryString::new()
+            .with("q", Value::from_str(&query))
+            .with("owned", Value::from(complex));
+        assert_eq!(
+            qs.to_string(),
+            "?q=apple???&owned=complex"
+        );
     }
 
     #[test]
