@@ -3,7 +3,9 @@
 All notable changes to this project will be documented in this file.
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.5.1] - 2024-05-24
+
+[0.5.1]: https://github.com/sunsided/query-string-builder/releases/tag/v0.5.1
 
 ### Internal
 

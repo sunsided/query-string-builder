@@ -2,7 +2,7 @@
 name = "query-string-builder"
 description = "A query string builder for percent encoding key-value pairs"
 authors = ["Markus Mayer"]
-version = "0.5.0"
+version = "0.5.1"
 edition = "2021"
 repository = "https://github.com/sunsided/query-string-builder"
 keywords = ["url", "query-string", "query-argument"]
