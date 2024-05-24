@@ -19,10 +19,17 @@
 //!     "example.com/?q=%F0%9F%8D%8E%20apple&tasty=true&category=fruits%20and%20vegetables?"
 //! );
 //! ```
+//!
+//! ## Crate features
+//!
+//! * `eager`: Percent-encodes the keys and values as soon as they are provided to the builder.
+//!            While this increases resource utilization when constructing, rendering / displaying
+//!            the final string becomes faster. If you only use a constructed query string once,
+//!            this option is likely not useful to you.
 
 #![deny(unsafe_code)]
 
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Display, Formatter};
 
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
 
@@ -59,7 +66,7 @@ const QUERY: &AsciiSet = &CONTROLS
 ///     "https://example.com/?q=apple&category=fruits%20and%20vegetables"
 /// );
 /// ```
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct QueryString {
     pairs: Vec<Kvp>,
 }
@@ -90,10 +97,7 @@ impl QueryString {
     /// );
     /// ```
     pub fn with_value<K: ToString, V: ToString>(mut self, key: K, value: V) -> Self {
-        self.pairs.push(Kvp {
-            key: key.to_string(),
-            value: value.to_string(),
-        });
+        self.pairs.push(Kvp::new(key, value));
         self
     }
 
@@ -140,10 +144,7 @@ impl QueryString {
     /// );
     /// ```
     pub fn push<K: ToString, V: ToString>(&mut self, key: K, value: V) -> &Self {
-        self.pairs.push(Kvp {
-            key: key.to_string(),
-            value: value.to_string(),
-        });
+        self.pairs.push(Kvp::new(key, value));
         self
     }
 
@@ -235,22 +236,62 @@ impl Display for QueryString {
                 if i > 0 {
                     write!(f, "&")?;
                 }
-                write!(
-                    f,
-                    "{key}={value}",
-                    key = utf8_percent_encode(&pair.key, QUERY),
-                    value = utf8_percent_encode(&pair.value, QUERY)
-                )?;
+
+                write!(f, "{key}={value}", key = pair.key, value = pair.value)?;
             }
             Ok(())
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct Kvp {
-    key: String,
-    value: String,
+    key: Text,
+    value: Text,
+}
+
+impl Kvp {
+    pub fn new<K: ToString, V: ToString>(key: K, value: V) -> Self {
+        let key = key.to_string();
+        let value = value.to_string();
+
+        #[cfg(not(feature = "eager"))]
+        {
+            Self {
+                key: Text::Unformatted(key),
+                value: Text::Unformatted(value),
+            }
+        }
+
+        #[cfg(feature = "eager")]
+        {
+            Self {
+                key: Text::Formatted(utf8_percent_encode(&key, crate::QUERY).to_string()),
+                value: Text::Formatted(utf8_percent_encode(&value, crate::QUERY).to_string()),
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+enum Text {
+    /// The text is kept as it was provided originally. Percent encoding is done when rendering.
+    #[cfg(not(feature = "eager"))]
+    Unformatted(String),
+    /// The text is already percent encoded and can be used as-is when rendering.
+    #[cfg(feature = "eager")]
+    Formatted(String),
+}
+
+impl Display for Text {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            #[cfg(not(feature = "eager"))]
+            Text::Unformatted(text) => write!(f, "{}", utf8_percent_encode(&text, QUERY)),
+            #[cfg(feature = "eager")]
+            Text::Formatted(text) => write!(f, "{}", text),
+        }
+    }
 }
 
 #[cfg(test)]

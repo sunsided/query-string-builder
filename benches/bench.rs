@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use query_string_builder::QueryString;
 
@@ -39,6 +39,14 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
             format!("{qs}")
         })
+    });
+
+    // Test focusing on printing more often than creating.
+    c.bench_function("print_alot", |b| {
+        let qs = QueryString::new()
+            .with_value("q", "apple???")
+            .with_value("category", "fruits and vegetables");
+        b.iter(|| format!("{}", black_box(&qs)))
     });
 }
 
