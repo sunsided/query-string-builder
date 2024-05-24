@@ -22,14 +22,12 @@
 
 #![deny(unsafe_code)]
 
-use std::fmt::{Display, Formatter};
-use std::rc::Rc;
-use std::sync::Arc;
+use std::fmt::{Display, Formatter, Write};
 
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 
 /// https://url.spec.whatwg.org/#fragment-percent-encode-set
-const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
+const QUERY: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
 
 /// A query string builder for percent encoding key-value pairs.
 ///
@@ -48,11 +46,11 @@ const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').ad
 /// );
 /// ```
 #[derive(Default)]
-pub struct QueryString {
-    pairs: Vec<Kvp>,
+pub struct QueryString<'a> {
+    pairs: Vec<Kvp<'a>>,
 }
 
-impl QueryString {
+impl<'a> QueryString<'a> {
     /// Creates a new, empty query string builder.
     pub fn new() -> Self {
         Self {
@@ -77,37 +75,8 @@ impl QueryString {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables&answer=42"
     /// );
     /// ```
-    pub fn with_value<K: ToString, V: ToString>(mut self, key: K, value: V) -> Self {
-        self.pairs.push(Kvp {
-            key: key.to_string(),
-            value: Value::eager(value),
-        });
-        self
-    }
-
-    /// Appends a key-value pair to the query string. Supports lazy evaluation.
-    ///
-    /// ## Example
-    ///
-    /// ```
-    /// use std::sync::Arc;
-    /// use query_string_builder::{QueryString, Value};
-    ///
-    /// let qs = QueryString::new()
-    ///             .with("q", Value::eager("🍎 apple"))
-    ///             .with("category", || "fruits and vegetables")
-    ///             .with("answer", Arc::new(42));
-    ///
-    /// assert_eq!(
-    ///     format!("https://example.com/{qs}"),
-    ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables&answer=42"
-    /// );
-    /// ```
-    pub fn with<K: ToString, V: Into<Value>>(mut self, key: K, value: V) -> Self {
-        self.pairs.push(Kvp {
-            key: key.to_string(),
-            value: value.into(),
-        });
+    pub fn with_value<K: ToString + 'static, V: ToString + 'static>(mut self, key: K, value: V) -> Self {
+        self.pairs.push(Kvp::new(QueryPart::from_tostring(key), QueryPart::from_tostring(value)));
         self
     }
 
@@ -129,7 +98,7 @@ impl QueryString {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple&category=fruits%20and%20vegetables&works=true"
     /// );
     /// ```
-    pub fn with_opt_value<K: ToString, V: ToString>(self, key: K, value: Option<V>) -> Self {
+    pub fn with_opt_value<K: ToString + 'static, V: ToString + 'static>(self, key: K, value: Option<V>) -> Self {
         if let Some(value) = value {
             self.with_value(key, value)
         } else {
@@ -153,11 +122,8 @@ impl QueryString {
     ///     "https://example.com/?q=apple&category=fruits%20and%20vegetables"
     /// );
     /// ```
-    pub fn push<K: ToString, V: ToString>(&mut self, key: K, value: V) -> &Self {
-        self.pairs.push(Kvp {
-            key: key.to_string(),
-            value: Value::eager(value),
-        });
+    pub fn push<K: ToString + 'static, V: ToString + 'static>(&mut self, key: K, value: V) -> &Self {
+        self.pairs.push(Kvp::new(QueryPart::from_tostring(key), QueryPart::from_tostring(value)));
         self
     }
 
@@ -177,7 +143,7 @@ impl QueryString {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple"
     /// );
     /// ```
-    pub fn push_opt<K: ToString, V: ToString>(&mut self, key: K, value: Option<V>) -> &Self {
+    pub fn push_opt<K: ToString + 'static, V: ToString + 'static>(&mut self, key: K, value: Option<V>) -> &Self {
         if let Some(value) = value {
             self.push(key, value)
         } else {
@@ -212,7 +178,7 @@ impl QueryString {
     ///     "https://example.com/?q=apple&q=pear"
     /// );
     /// ```
-    pub fn append(&mut self, mut other: QueryString) {
+    pub fn append(&mut self, mut other: QueryString<'a>) {
         self.pairs.append(&mut other.pairs)
     }
 
@@ -233,121 +199,66 @@ impl QueryString {
     ///     "https://example.com/?q=apple&q=pear"
     /// );
     /// ```
-    pub fn append_into(mut self, mut other: QueryString) -> Self {
+    pub fn append_into(mut self, mut other: QueryString<'a>) -> Self {
         self.pairs.append(&mut other.pairs);
         self
     }
 }
 
-impl Display for QueryString {
+impl<'a> Display for QueryString<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.pairs.is_empty() {
             Ok(())
         } else {
-            write!(f, "?")?;
+            f.write_char('?')?;
             for (i, pair) in self.pairs.iter().enumerate() {
                 if i > 0 {
-                    write!(f, "&")?;
+                    f.write_char('&')?;
                 }
 
-                // We convert the value to a String here. Ideally we'd print it directly (skipping
-                // the intermediate string generation) but due to the required percent encoding
-                // this isn't immediately possible.
-                let value = pair.value.render();
-
-                write!(
-                    f,
-                    "{key}={value}",
-                    key = utf8_percent_encode(&pair.key, FRAGMENT),
-                    value = utf8_percent_encode(&value, FRAGMENT)
-                )?;
+                Display::fmt(&utf8_percent_encode(&pair.key.to_string(), QUERY), f)?;
+                f.write_char('=')?;
+                Display::fmt(&utf8_percent_encode(&pair.value.to_string(), QUERY), f)?;
             }
             Ok(())
         }
     }
 }
 
-struct Kvp {
-    key: String,
-    value: Value,
+pub struct Key<'a>(QueryPart<'a>);
+
+pub struct Value<'a>(QueryPart<'a>);
+
+struct Kvp<'a> {
+    key: QueryPart<'a>,
+    value: QueryPart<'a>,
 }
 
-pub struct Value {
-    value: Box<dyn Fn() -> String>,
-}
-
-impl Value {
-    pub fn eager<T: ToString>(value: T) -> Self {
-        let value = value.to_string();
-        Value {
-            value: Box::new(move || value.to_string()),
-        }
-    }
-
-    pub fn lazy<T: ToString + 'static>(value: T) -> Self {
-        Value {
-            value: Box::new(move || value.to_string()),
-        }
-    }
-
-    pub fn lazy_box<T: ToString + 'static>(value: Box<T>) -> Self {
-        Value {
-            value: Box::new(move || value.to_string()),
-        }
-    }
-
-    pub fn lazy_rc<T: ToString + 'static>(value: Rc<T>) -> Self {
-        Value {
-            value: Box::new(move || value.to_string()),
-        }
-    }
-
-    pub fn lazy_arc<T: ToString + 'static>(value: Arc<T>) -> Self {
-        Value {
-            value: Box::new(move || value.to_string()),
-        }
-    }
-
-    pub fn lazy_fn<F, T>(func: F) -> Self
-    where
-        F: Fn() -> T + 'static,
-        T: ToString + 'static,
-    {
-        Value {
-            value: Box::new(move || func().to_string()),
-        }
-    }
-
-    fn render(&self) -> String {
-        (self.value)()
+impl<'a> Kvp<'a> {
+    pub fn new<K: Into<QueryPart<'a>>, V: Into<QueryPart<'a>>>(key: K, value: V) -> Self {
+        Self { key: key.into(), value: value.into() }
     }
 }
 
-impl<T> From<Rc<T>> for Value
-where
-    T: ToString + 'static,
-{
-    fn from(value: Rc<T>) -> Self {
-        Value::lazy_rc(value)
+enum QueryPart<'a> {
+    Owned(Box<dyn ToString>),
+    Reference(&'a dyn ToString),
+    Boxed(Box<dyn Fn(&mut Formatter) -> std::fmt::Result>),
+}
+
+impl<'a> QueryPart<'a> {
+    pub fn from_tostring<T: ToString + 'static>(text: T) -> Self {
+        Self::Owned(Box::new(text))
     }
 }
 
-impl<T> From<Arc<T>> for Value
-where
-    T: ToString + 'static,
-{
-    fn from(value: Arc<T>) -> Self {
-        Value::lazy_arc(value)
-    }
-}
-
-impl<F, T> From<F> for Value
-where
-    F: Fn() -> T + 'static,
-    T: ToString + 'static,
-{
-    fn from(value: F) -> Self {
-        Value::lazy_fn(value)
+impl<'a> Display for QueryPart<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QueryPart::Owned(b) => f.write_str(&b.to_string()),
+            QueryPart::Reference(b) => f.write_str(&b.to_string()),
+            QueryPart::Boxed(b) => b(f),
+        }
     }
 }
 
@@ -376,33 +287,6 @@ mod tests {
         );
         assert_eq!(qs.len(), 4);
         assert!(!qs.is_empty());
-    }
-
-    #[test]
-    fn test_lazy() {
-        let qs = QueryString::new()
-            .with("x", Value::eager("y"))
-            .with("q", Value::lazy("apple???"))
-            .with("category", Value::lazy_fn(|| "fruits and vegetables"))
-            .with("tasty", Value::lazy_box(Box::new(true)))
-            .with("weight", Value::lazy_arc(Arc::new(99.9)));
-        assert_eq!(
-            qs.to_string(),
-            "?x=y&q=apple???&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
-        );
-    }
-
-    #[test]
-    fn test_lazy_implicit() {
-        let qs = QueryString::new()
-            .with("q", Value::lazy("apple???"))
-            .with("category", || "fruits and vegetables")
-            .with("tasty", Rc::new(true))
-            .with("weight", Arc::new(99.9));
-        assert_eq!(
-            qs.to_string(),
-            "?q=apple???&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
-        );
     }
 
     #[test]
