@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter, Write};
 
-use crate::{QueryString, QUERY};
+use crate::QUERY;
 use percent_encoding::utf8_percent_encode;
 
 /// A type alias for the [`WrappedQueryString`] root.
@@ -30,7 +30,7 @@ pub type QueryStringSimple = WrappedQueryString<RootMarker, EmptyValue>;
 /// ```
 pub struct WrappedQueryString<B, T>
 where
-    B: ConditionalDisplay + Identifyable,
+    B: ConditionalDisplay + Identifiable,
     T: Display,
 {
     base: BaseOption<B>,
@@ -39,7 +39,7 @@ where
 
 impl Default for QueryStringSimple {
     fn default() -> Self {
-        QueryString::simple()
+        QueryStringSimple::new()
     }
 }
 
@@ -73,7 +73,7 @@ pub struct EmptyValue(());
 
 impl<B, T> WrappedQueryString<B, T>
 where
-    B: ConditionalDisplay + Identifyable,
+    B: ConditionalDisplay + Identifiable,
     T: Display,
 {
     /// Creates a new, empty query string builder.
@@ -173,32 +173,38 @@ where
     }
 }
 
-pub trait Identifyable {
+pub trait Identifiable {
     fn is_root(&self) -> bool;
     fn is_empty(&self) -> bool;
     fn len(&self) -> usize;
-}
-
-impl Identifyable for RootMarker {
-    fn is_root(&self) -> bool {
-        true
-    }
-
-    fn is_empty(&self) -> bool {
-        true
-    }
-
-    fn len(&self) -> usize {
-        0
-    }
 }
 
 pub trait ConditionalDisplay {
     fn cond_fmt(&self, should_display: bool, f: &mut Formatter<'_>) -> Result<usize, fmt::Error>;
 }
 
+impl Identifiable for RootMarker {
+    fn is_root(&self) -> bool {
+        unreachable!()
+    }
+
+    fn is_empty(&self) -> bool {
+        unreachable!()
+    }
+
+    fn len(&self) -> usize {
+        unreachable!()
+    }
+}
+
 impl ConditionalDisplay for RootMarker {
     fn cond_fmt(&self, _should_display: bool, _f: &mut Formatter<'_>) -> Result<usize, fmt::Error> {
+        unreachable!()
+    }
+}
+
+impl Display for RootMarker {
+    fn fmt(&self, _f: &mut Formatter<'_>) -> fmt::Result {
         unreachable!()
     }
 }
@@ -223,7 +229,7 @@ where
 
 impl<B, T> ConditionalDisplay for WrappedQueryString<B, T>
 where
-    B: ConditionalDisplay + Identifyable,
+    B: ConditionalDisplay + Identifiable,
     T: Display,
 {
     fn cond_fmt(&self, should_display: bool, f: &mut Formatter<'_>) -> Result<usize, fmt::Error> {
@@ -260,7 +266,7 @@ where
 
 impl<B> BaseOption<B>
 where
-    B: Identifyable + ConditionalDisplay,
+    B: Identifiable + ConditionalDisplay,
 {
     fn is_empty(&self) -> bool {
         match self {
@@ -277,9 +283,9 @@ where
     }
 }
 
-impl<B, T> Identifyable for WrappedQueryString<B, T>
+impl<B, T> Identifiable for WrappedQueryString<B, T>
 where
-    B: ConditionalDisplay + Identifyable,
+    B: ConditionalDisplay + Identifiable,
     T: Display,
 {
     fn is_root(&self) -> bool {
@@ -313,14 +319,8 @@ impl<T> KvpOption<T> {
     }
 }
 
-impl Display for RootMarker {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_char('?')
-    }
-}
-
 impl Display for EmptyValue {
-    fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut Formatter<'_>) -> fmt::Result {
         Ok(())
     }
 }
@@ -363,7 +363,7 @@ where
 
 impl<B, T> Display for WrappedQueryString<B, T>
 where
-    B: ConditionalDisplay + Identifyable,
+    B: ConditionalDisplay + Identifiable,
     T: Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -380,7 +380,7 @@ where
 
 impl<B, T> Debug for WrappedQueryString<B, T>
 where
-    B: ConditionalDisplay + Identifyable,
+    B: ConditionalDisplay + Identifiable,
     T: Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -390,6 +390,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::slim::{BaseOption, EmptyValue, KvpOption};
     use crate::QueryString;
 
     #[test]
@@ -426,7 +427,7 @@ mod tests {
         assert_eq!(qs.len(), 4);
 
         assert_eq!(
-            qs.to_string(),
+            format!("{qs}"),
             "?q=apple???&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
         );
     }
@@ -453,7 +454,7 @@ mod tests {
         assert_eq!(qs.len(), 2);
 
         assert_eq!(
-            qs.to_string(),
+            format!("{qs:?}"),
             "?q=%F0%9F%A5%A6&%F0%9F%8D%BD%EF%B8%8F=%F0%9F%8D%94%F0%9F%8D%95"
         );
     }
@@ -475,5 +476,12 @@ mod tests {
             "?q=celery&category=fruits%20and%20vegetables&tasty=true&weight=99.9"
         );
         assert_eq!(qs.len(), 4); // not five!
+    }
+
+    #[test]
+    fn test_display() {
+        assert_eq!(format!("{}", KvpOption::<i32>::None), "");
+        assert_eq!(format!("{}", BaseOption::<i32>::None), "");
+        assert_eq!(format!("{}", EmptyValue(())), "");
     }
 }

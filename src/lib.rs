@@ -89,7 +89,7 @@ impl QueryString {
     /// ```
     #[allow(clippy::new_ret_no_self)]
     pub fn simple() -> QueryStringSimple {
-        QueryStringSimple::new()
+        QueryStringSimple::default()
     }
 
     /// Creates a new, empty query string builder.
@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn test_empty() {
-        let qs = QueryString::dynamic();
+        let qs = QueryStringSimple::default();
         assert_eq!(qs.to_string(), "");
         assert_eq!(qs.len(), 0);
         assert!(qs.is_empty());
