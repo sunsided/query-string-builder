@@ -13,7 +13,7 @@ The initial `?` question mark is automatically prepended.
 use query_string_builder::QueryString;
 
 fn main() {
-    let qs = QueryString::new()
+    let qs = QueryString::simple()
         .with_value("q", "apple")
         .with_value("tasty", true)
         .with_value("weight", 70.0)

@@ -8,7 +8,7 @@
 //! ```
 //! use query_string_builder::QueryString;
 //!
-//! let qs = QueryString::dynamic()
+//! let qs = QueryString::simple()
 //!             .with_value("q", "🍎 apple")
 //!             .with_value("tasty", true)
 //!             .with_opt_value("color", None::<String>)
