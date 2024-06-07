@@ -8,7 +8,7 @@
 //! ```
 //! use query_string_builder::QueryString;
 //!
-//! let qs = QueryString::new()
+//! let qs = QueryString::dynamic()
 //!             .with_value("q", "🍎 apple")
 //!             .with_value("tasty", true)
 //!             .with_opt_value("color", None::<String>)
@@ -22,12 +22,15 @@
 
 #![deny(unsafe_code)]
 
-use std::fmt::{Debug, Display, Formatter, Write};
+mod slim;
 
 use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use std::fmt::{Debug, Display, Formatter, Write};
+
+pub use slim::{QueryStringSimple, WrappedQueryString};
 
 /// https://url.spec.whatwg.org/#query-percent-encode-set
-const QUERY: &AsciiSet = &CONTROLS
+pub(crate) const QUERY: &AsciiSet = &CONTROLS
     .add(b' ')
     .add(b'"')
     .add(b'#')
@@ -50,7 +53,7 @@ const QUERY: &AsciiSet = &CONTROLS
 /// ```
 /// use query_string_builder::QueryString;
 ///
-/// let qs = QueryString::new()
+/// let qs = QueryString::dynamic()
 ///             .with_value("q", "apple")
 ///             .with_value("category", "fruits and vegetables");
 ///
@@ -59,14 +62,38 @@ const QUERY: &AsciiSet = &CONTROLS
 ///     "https://example.com/?q=apple&category=fruits%20and%20vegetables"
 /// );
 /// ```
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct QueryString {
     pairs: Vec<Kvp>,
 }
 
 impl QueryString {
     /// Creates a new, empty query string builder.
-    pub fn new() -> Self {
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryString;
+    ///
+    /// let weight: &f32 = &99.9;
+    ///
+    /// let qs = QueryString::simple()
+    ///             .with_value("q", "apple")
+    ///             .with_value("category", "fruits and vegetables")
+    ///             .with_opt_value("weight", Some(weight));
+    ///
+    /// assert_eq!(
+    ///     format!("https://example.com/{qs}"),
+    ///     "https://example.com/?q=apple&category=fruits%20and%20vegetables&weight=99.9"
+    /// );
+    /// ```
+    #[allow(clippy::new_ret_no_self)]
+    pub fn simple() -> QueryStringSimple {
+        QueryStringSimple::default()
+    }
+
+    /// Creates a new, empty query string builder.
+    pub fn dynamic() -> Self {
         Self {
             pairs: Vec::default(),
         }
@@ -79,7 +106,7 @@ impl QueryString {
     /// ```
     /// use query_string_builder::QueryString;
     ///
-    /// let qs = QueryString::new()
+    /// let qs = QueryString::dynamic()
     ///             .with_value("q", "🍎 apple")
     ///             .with_value("category", "fruits and vegetables")
     ///             .with_value("answer", 42);
@@ -104,7 +131,7 @@ impl QueryString {
     /// ```
     /// use query_string_builder::QueryString;
     ///
-    /// let qs = QueryString::new()
+    /// let qs = QueryString::dynamic()
     ///             .with_opt_value("q", Some("🍎 apple"))
     ///             .with_opt_value("f", None::<String>)
     ///             .with_opt_value("category", Some("fruits and vegetables"))
@@ -130,7 +157,7 @@ impl QueryString {
     /// ```
     /// use query_string_builder::QueryString;
     ///
-    /// let mut qs = QueryString::new();
+    /// let mut qs = QueryString::dynamic();
     /// qs.push("q", "apple");
     /// qs.push("category", "fruits and vegetables");
     ///
@@ -154,7 +181,7 @@ impl QueryString {
     /// ```
     /// use query_string_builder::QueryString;
     ///
-    /// let mut qs = QueryString::new();
+    /// let mut qs = QueryString::dynamic();
     /// qs.push_opt("q", None::<String>);
     /// qs.push_opt("q", Some("🍎 apple"));
     ///
@@ -188,8 +215,8 @@ impl QueryString {
     /// ```
     /// use query_string_builder::QueryString;
     ///
-    /// let mut qs = QueryString::new().with_value("q", "apple");
-    /// let more = QueryString::new().with_value("q", "pear");
+    /// let mut qs = QueryString::dynamic().with_value("q", "apple");
+    /// let more = QueryString::dynamic().with_value("q", "pear");
     ///
     /// qs.append(more);
     ///
@@ -209,8 +236,8 @@ impl QueryString {
     /// ```
     /// use query_string_builder::QueryString;
     ///
-    /// let qs = QueryString::new().with_value("q", "apple");
-    /// let more = QueryString::new().with_value("q", "pear");
+    /// let qs = QueryString::dynamic().with_value("q", "apple");
+    /// let more = QueryString::dynamic().with_value("q", "pear");
     ///
     /// let qs = qs.append_into(more);
     ///
@@ -257,7 +284,7 @@ mod tests {
 
     #[test]
     fn test_empty() {
-        let qs = QueryString::new();
+        let qs = QueryStringSimple::default();
         assert_eq!(qs.to_string(), "");
         assert_eq!(qs.len(), 0);
         assert!(qs.is_empty());
@@ -265,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_simple() {
-        let qs = QueryString::new()
+        let qs = QueryString::dynamic()
             .with_value("q", "apple???")
             .with_value("category", "fruits and vegetables")
             .with_value("tasty", true)
@@ -280,7 +307,7 @@ mod tests {
 
     #[test]
     fn test_encoding() {
-        let qs = QueryString::new()
+        let qs = QueryString::dynamic()
             .with_value("q", "Grünkohl")
             .with_value("category", "Gemüse");
         assert_eq!(qs.to_string(), "?q=Gr%C3%BCnkohl&category=Gem%C3%BCse");
@@ -288,7 +315,7 @@ mod tests {
 
     #[test]
     fn test_emoji() {
-        let qs = QueryString::new()
+        let qs = QueryString::dynamic()
             .with_value("q", "🥦")
             .with_value("🍽️", "🍔🍕");
         assert_eq!(
@@ -299,7 +326,7 @@ mod tests {
 
     #[test]
     fn test_optional() {
-        let qs = QueryString::new()
+        let qs = QueryString::dynamic()
             .with_value("q", "celery")
             .with_opt_value("taste", None::<String>)
             .with_opt_value("category", Some("fruits and vegetables"))
@@ -314,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_push_optional() {
-        let mut qs = QueryString::new();
+        let mut qs = QueryString::dynamic();
         qs.push("a", "apple");
         qs.push_opt("b", None::<String>);
         qs.push_opt("c", Some("🍎 apple"));
@@ -327,11 +354,11 @@ mod tests {
 
     #[test]
     fn test_append() {
-        let qs = QueryString::new().with_value("q", "apple");
-        let more = QueryString::new().with_value("q", "pear");
+        let qs = QueryString::dynamic().with_value("q", "apple");
+        let more = QueryString::dynamic().with_value("q", "pear");
 
         let mut qs = qs.append_into(more);
-        qs.append(QueryString::new().with_value("answer", "42"));
+        qs.append(QueryString::dynamic().with_value("answer", "42"));
 
         assert_eq!(
             format!("https://example.com/{qs}"),
@@ -371,7 +398,7 @@ mod tests {
             ("right_curly", "}", "}"),
         ];
 
-        let mut qs = QueryString::new();
+        let mut qs = QueryString::dynamic();
         for (key, value, _) in &tests {
             qs.push(key.to_string(), value.to_string());
         }
