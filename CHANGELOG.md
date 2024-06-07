@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- The `QueryString::simple` function was added to construct the new `QueryStringSimple` type.
+  This type reduces string allocations, defers rendering and can keep references
+  but at the cost of a complex type signature slightly more rigid handling.
+
+### Changed
+
+- The `QueryString::new` function was renamed to `QueryString::dynamic`.
+
 ## [0.5.1] - 2024-05-24
 
 [0.5.1]: https://github.com/sunsided/query-string-builder/releases/tag/v0.5.1
