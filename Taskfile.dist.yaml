@@ -1,0 +1,102 @@
+version: '3'
+
+vars:
+  MSRV: "1.66"
+
+tasks:
+  default:
+    cmds:
+      - task --list --sort=none
+    silent: true
+
+  build:
+    desc: Build the crate (all targets)
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - cargo build --all-targets
+
+  test:
+    desc: Run unit and doc tests
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - cargo test {{.CLI_ARGS}}
+
+  fmt:
+    desc: Format code
+    aliases: [format]
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - cargo fmt --all
+
+  lint:
+    desc: Run clippy (deny warnings) and check formatting
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - cargo fmt --all -- --check
+      - cargo clippy --all-targets -- -D warnings
+
+  lint:fix:
+    desc: Apply clippy fixes and format
+    aliases: [fix]
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - cargo clippy --all-targets --fix --allow-dirty --allow-staged
+      - cargo fmt --all
+
+  check:
+    desc: All static checks (fmt + clippy)
+    cmds:
+      - task: lint
+
+  msrv:
+    desc: Verify the crate builds on the declared MSRV ({{.MSRV}})
+    preconditions:
+      - sh: rustup toolchain list | grep -q "{{.MSRV}}"
+        msg: "Rust {{.MSRV}} toolchain required — rustup toolchain install {{.MSRV}}"
+    cmds:
+      - cargo +{{.MSRV}} check
+
+  bench:
+    desc: Run criterion benchmarks
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - cargo bench {{.CLI_ARGS}}
+
+  docs:
+    desc: Build documentation
+    preconditions:
+      - sh: command -v cargo
+        msg: "cargo not found — install Rust from https://rustup.rs/"
+    cmds:
+      - cargo doc --no-deps
+
+  docs:open:
+    desc: Build and open documentation
+    cmds:
+      - cargo doc --no-deps --open
+
+  ci:
+    desc: Full CI sequence (checks + tests + docs)
+    cmds:
+      - task: check
+      - task: test
+      - task: docs
+
+  clean:
+    desc: Remove build output
+    status:
+      - test ! -d target
+    cmds:
+      - cargo clean
