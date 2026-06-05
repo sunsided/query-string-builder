@@ -2,8 +2,9 @@
 name = "query-string-builder"
 description = "A query string builder for percent encoding key-value pairs"
 authors = ["Markus Mayer"]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
+rust-version = "1.66"
 repository = "https://github.com/sunsided/query-string-builder"
 keywords = ["url", "query-string", "query-argument"]
 categories = ["web-programming::http-client"]
@@ -18,8 +19,4 @@ criterion = "0.5.1"
 
 [[bench]]
 name = "bench"
-harness = false
-
-[[bench]]
-name = "bench_slim"
 harness = false
