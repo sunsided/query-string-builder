@@ -16,6 +16,8 @@ percent-encoding = { version = "2.3.2", default-features = false, features = ["s
 
 [dev-dependencies]
 criterion = "0.5.1"
+percent-encoding = "2.3.2"
+proptest = "1"
 
 [[bench]]
 name = "bench"
