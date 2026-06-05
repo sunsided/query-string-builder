@@ -3,6 +3,53 @@
 All notable changes to this project will be documented in this file.
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-06-05
+
+[0.7.0]: https://github.com/sunsided/query-string-builder/releases/tag/v0.7.0
+
+### Changed (breaking)
+
+- `QueryString` is now a zero-allocation borrowing builder `QueryString<'a>`:
+  it borrows keys and values (any `Display` type) and allocates no strings,
+  neither while building nor while rendering — only a single `Vec` for the
+  pair list. Construct it with `QueryString::new()`.
+- The builder methods were shortened: `with_value` → `with` and
+  `with_opt_value` → `with_opt` (doc aliases preserve searchability).
+- The `simple()` and `dynamic()` constructors were removed.
+
+### Added
+
+- `QueryStringOwned`: the owning twin of `QueryString` with the identical API
+  and no lifetime parameter, for storing the builder in structs or returning
+  it from functions (eagerly allocates via `ToString`, like the 0.6
+  `QueryString`).
+- `QueryString::into_owned()` converts a borrowing builder into a
+  `QueryStringOwned`, rendering each pair to owned strings.
+- `IntoPart` / `Part`: the conversion trait and storage type backing the
+  borrowing builder's arguments (`&str`, `&String`, `&i32`, `&bool`, …).
+- `rust-version = "1.66"` (MSRV) is now declared in `Cargo.toml`.
+
+### Removed
+
+- `QueryStringSimple` and `WrappedQueryString` (the nested-generics slim
+  builder) were removed; `QueryString<'a>` supersedes them with a plain,
+  storable type and truly allocation-free rendering.
+- The borrowing `QueryString` no longer implements `PartialEq`/`Eq`
+  (its `Debug` implementation is hand-written and renders the pairs).
+
+### Migration
+
+| 0.6                                     | 0.7                                          |
+|-----------------------------------------|----------------------------------------------|
+| `QueryString::dynamic()`                | `QueryStringOwned::new()` (same behavior)    |
+| `QueryString::simple()`                 | `QueryString::new()` (now truly zero-alloc)  |
+| `.with_value(k, v)`                     | `.with(k, &v)` / owned: `.with(k, v)`        |
+| `.with_opt_value(k, v)`                 | `.with_opt(k, v.as_ref())` / owned: as-is    |
+| `QueryStringSimple`/`WrappedQueryString`| removed; use `QueryString<'a>`               |
+
+Note: the borrowing `QueryString` borrows its values — bind temporaries to a
+variable before passing them (`let v = x.to_string();` then `.with("k", &v)`).
+
 ## [0.6.0] - 2024-06-08
 
 [0.6.0]: https://github.com/sunsided/query-string-builder/releases/tag/v0.6.0
