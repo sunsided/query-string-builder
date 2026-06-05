@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  MSRV: "1.66"
+  MSRV: "1.87"
 
 tasks:
   default:

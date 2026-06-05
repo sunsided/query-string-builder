@@ -1,7 +1,7 @@
 //! The borrowing, zero-allocation query string builder.
 
 use crate::encode::write_encoded;
-use crate::{QueryStringOwned, QUERY};
+use crate::{QUERY, QueryStringOwned};
 use percent_encoding::utf8_percent_encode;
 use std::fmt::{self, Debug, Display, Formatter, Write};
 

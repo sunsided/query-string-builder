@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-06-05
+
+[0.7.1]: https://github.com/sunsided/query-string-builder/releases/tag/v0.7.1
+
+### Changed
+
+- The crate now uses Rust edition 2024; the MSRV is raised to 1.87.
+- Dependencies were upgraded (`percent-encoding` 2.3.2).
+
 ## [0.7.0] - 2026-06-05
 
 [0.7.0]: https://github.com/sunsided/query-string-builder/releases/tag/v0.7.0
