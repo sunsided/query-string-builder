@@ -1,0 +1,28 @@
+---
+version: 2
+
+updates:
+  # Keeps the SHA-pinned actions and their version comments current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # Let new releases age before proposing them, so a compromised release
+    # has time to be noticed and yanked.
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      cargo-dev-dependencies:
+        dependency-type: development
+      cargo-dependencies:
+        dependency-type: production
