@@ -24,12 +24,18 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions: {}
+
 jobs:
   lint:
     name: Lint code
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Check format
         run: cargo fmt --check
 
@@ -37,6 +43,8 @@ jobs:
     needs: lint
     name: Build and Test
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
@@ -45,10 +53,12 @@ jobs:
           # - '--no-default-features'
           # - ''
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Build
         run: cargo build --verbose
-      - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@42b98ff034a377bb5e4aa99118b5b160f96a8ef2 # nextest
       - name: Run tests
         run: cargo nextest run --verbose ${{ matrix.features }}
       - name: Run doctests
@@ -58,9 +68,13 @@ jobs:
     needs: lint
     name: Build no_std
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: riscv32imc-unknown-none-elf
       - name: Check without alloc
@@ -74,23 +88,27 @@ jobs:
     needs: lint
     name: Code Coverage
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Build
         run: cargo build --verbose
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: llvm-tools-preview
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+        uses: taiki-e/install-action@f9ee2b3488b5862cca1caf86effaa61f55953001 # cargo-llvm-cov
       - name: Install nextest
-        uses: taiki-e/install-action@nextest
+        uses: taiki-e/install-action@42b98ff034a377bb5e4aa99118b5b160f96a8ef2 # nextest
       - name: Generate code coverage
         run: cargo llvm-cov nextest --all-features --workspace --lcov --output-path lcov.info
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4.0.1
+        uses: codecov/codecov-action@e0b68c6749509c5f83f984dd99a76a1c1a231044 # v4.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info
