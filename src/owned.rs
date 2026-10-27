@@ -1,7 +1,8 @@
 //! The owning query string builder, backed by a single encoded buffer.
 
 use crate::encode::write_encoded;
-use std::fmt::{self, Display, Formatter, Write};
+use alloc::string::String;
+use core::fmt::{self, Display, Formatter, Write};
 
 /// An owning query string builder for percent encoding key-value pairs.
 ///
@@ -132,7 +133,7 @@ impl QueryStringOwned {
     /// ## Panics
     ///
     /// Panics if a [`Display`] implementation of `key` or `value` returns an
-    /// error, just like [`ToString::to_string`] does.
+    /// error, just like [`ToString::to_string`](alloc::string::ToString::to_string) does.
     ///
     /// ## Example
     ///

@@ -1,8 +1,8 @@
 //! Zero-allocation percent encoding for [`Display`] values.
 
 use crate::QUERY;
+use core::fmt::{self, Display, Write};
 use percent_encoding::utf8_percent_encode;
-use std::fmt::{self, Display, Write};
 
 /// A [`fmt::Write`] adapter that percent-encodes every chunk written through it.
 ///
@@ -66,7 +66,7 @@ pub(crate) fn encoded_len(value: &dyn Display) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fmt::Formatter;
+    use core::fmt::Formatter;
 
     /// A `Display` implementation that writes in multiple small chunks,
     /// exercising the chunk-wise encoding path.

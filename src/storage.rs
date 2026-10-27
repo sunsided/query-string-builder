@@ -1,8 +1,10 @@
 //! Pluggable pair storage for the borrowing query string builder.
 
 use crate::Part;
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+use core::error::Error;
+use core::fmt::{self, Display, Formatter};
 
 /// A borrowed key-value pair as stored by [`QueryString`](crate::QueryString).
 pub type Pair<'a> = (Part<'a>, Part<'a>);
@@ -21,6 +23,7 @@ pub trait PairStorage<'a> {
     fn try_push(&mut self, pair: Pair<'a>) -> Result<(), Pair<'a>>;
 }
 
+#[cfg(feature = "alloc")]
 impl<'a> PairStorage<'a> for Vec<Pair<'a>> {
     #[inline]
     fn as_slice(&self) -> &[Pair<'a>] {

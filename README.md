@@ -69,6 +69,26 @@ Any other collection — e.g. `heapless::Vec` or `arrayvec::ArrayVec` — can be
 plugged in by implementing `PairStorage` and passing it to
 `QueryString::with_storage`.
 
+## `no_std`
+
+The crate is `#![no_std]`. Its default `alloc` feature provides
+`QueryStringOwned` and the `Vec`-backed storage; disable default features to
+use it on targets without an allocator, building on `InlinePairs` and rendering
+into any `core::fmt::Write` sink:
+
+```toml
+query-string-builder = { version = "0.8", default-features = false }
+```
+
+```rust,ignore
+use query_string_builder::{InlinePairs, QueryString};
+
+let qs = QueryString::with_storage(InlinePairs::<2>::new())
+    .with("q", "apple")
+    .with("color", "red");
+write!(uart, "GET /search{qs} HTTP/1.1\r\n")?;
+```
+
 ## Owned builder
 
 If you want to store the query string in a struct or return it from a function

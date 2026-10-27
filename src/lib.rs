@@ -44,17 +44,46 @@
 //!
 //! assert_eq!(format!("example.com/{qs}"), "example.com/?answer=42&works=true");
 //! ```
+//!
+//! ## `no_std`
+//!
+//! The crate is `#![no_std]`. The default `alloc` feature enables
+//! [`QueryStringOwned`], the [`Vec`](alloc::vec::Vec)-backed default storage of
+//! [`QueryString`] and the helpers rendering into a
+//! [`String`](alloc::string::String). Without it, build a [`QueryString`] on
+//! fixed-capacity [`InlinePairs`] (or any other [`PairStorage`]) and render it
+//! into any [`core::fmt::Write`] sink:
+//!
+//! ```
+//! use core::fmt::Write;
+//! use query_string_builder::{InlinePairs, QueryString};
+//!
+//! let answer = 42;
+//! let qs = QueryString::with_storage(InlinePairs::<2>::new())
+//!     .with("q", "apple")
+//!     .with("answer", &answer);
+//!
+//! # let mut out = String::new();
+//! write!(out, "{qs}").unwrap();
+//! assert_eq!(out, "?q=apple&answer=42");
+//! ```
 
+#![cfg_attr(not(test), no_std)]
 #![deny(unsafe_code)]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 mod borrowed;
 mod encode;
+#[cfg(feature = "alloc")]
 mod owned;
 mod storage;
 
 use percent_encoding::{AsciiSet, CONTROLS};
 
 pub use borrowed::{IntoPart, Part, QueryString};
+#[cfg(feature = "alloc")]
 pub use owned::QueryStringOwned;
 pub use storage::{CapacityError, InlinePairs, Pair, PairStorage};
 

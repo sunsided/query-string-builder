@@ -1,11 +1,17 @@
 //! The borrowing, zero-allocation query string builder.
 
+use crate::QUERY;
+#[cfg(feature = "alloc")]
+use crate::QueryStringOwned;
 use crate::encode::{encoded_len, encoded_str_len, write_encoded};
-use crate::storage::{CapacityError, InlinePairs, Pair, PairStorage};
-use crate::{QUERY, QueryStringOwned};
+#[cfg(feature = "alloc")]
+use crate::storage::InlinePairs;
+use crate::storage::{CapacityError, Pair, PairStorage};
+#[cfg(feature = "alloc")]
+use alloc::{string::String, vec::Vec};
+use core::fmt::{self, Debug, Display, Formatter, Write};
+use core::marker::PhantomData;
 use percent_encoding::utf8_percent_encode;
-use std::fmt::{self, Debug, Display, Formatter, Write};
-use std::marker::PhantomData;
 
 /// A borrowed key or value of a query string pair.
 ///
@@ -165,14 +171,28 @@ impl<'a, T: Display> IntoPart<'a> for &'a T {
 /// let qs = QueryString::new().with("answer", &answer);
 /// assert_eq!(qs.to_string(), "?answer=42");
 /// ```
+#[cfg(feature = "alloc")]
 #[derive(Clone)]
 pub struct QueryString<'a, S = Vec<Pair<'a>>> {
     pairs: S,
     _pairs: PhantomData<Pair<'a>>,
 }
 
+/// A zero-allocation query string builder for percent encoding key-value pairs.
+///
+/// Without the `alloc` feature there is no default storage; create the
+/// builder with [`with_storage`](Self::with_storage), e.g. on
+/// [`InlinePairs`](crate::InlinePairs).
+#[cfg(not(feature = "alloc"))]
+#[derive(Clone)]
+pub struct QueryString<'a, S> {
+    pairs: S,
+    _pairs: PhantomData<Pair<'a>>,
+}
+
 // Only the `Vec`-backed builder is `Default`, so `QueryString::default()`
 // keeps resolving without type annotations.
+#[cfg(feature = "alloc")]
 impl Default for QueryString<'_> {
     fn default() -> Self {
         Self::new()
@@ -182,6 +202,7 @@ impl Default for QueryString<'_> {
 /// The panic message of the infallible methods when storage is full.
 const STORAGE_FULL: &str = "query string pair storage is full";
 
+#[cfg(feature = "alloc")]
 impl<'a> QueryString<'a> {
     /// Creates a new, empty query string builder backed by a [`Vec`].
     ///
@@ -507,6 +528,7 @@ impl<'a, S: PairStorage<'a>> QueryString<'a, S> {
         self
     }
 
+    #[cfg(feature = "alloc")]
     /// Converts this borrowing builder into a [`QueryStringOwned`] by rendering
     /// it once into the owned builder's buffer.
     ///
@@ -562,16 +584,17 @@ impl<'a, S: PairStorage<'a>> QueryString<'a, S> {
             + separators
     }
 
+    #[cfg(feature = "alloc")]
     /// Appends the rendered query string to `out`, reserving the exact
     /// required capacity up front.
     ///
-    /// Unlike `format!` or [`ToString::to_string`], which grow the target
+    /// Unlike `format!` or [`ToString::to_string`](alloc::string::ToString::to_string), which grow the target
     /// string as they go, this reallocates `out` at most once.
     ///
     /// ## Panics
     ///
     /// Panics if a [`Display`] implementation of a key or value returns an
-    /// error, just like [`ToString::to_string`] does.
+    /// error, just like [`ToString::to_string`](alloc::string::ToString::to_string) does.
     ///
     /// ## Example
     ///
@@ -620,7 +643,55 @@ impl<'a, S: PairStorage<'a>> Debug for QueryString<'a, S> {
     }
 }
 
+/// Tests that only need `core`, run with and without the `alloc` feature.
 #[cfg(test)]
+mod core_tests {
+    use super::*;
+    use crate::InlinePairs;
+
+    /// A fixed-size `fmt::Write` sink, standing in for a `no_std` buffer.
+    struct FixedBuf {
+        bytes: [u8; 64],
+        len: usize,
+    }
+
+    impl Write for FixedBuf {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            let end = self.len + s.len();
+            self.bytes
+                .get_mut(self.len..end)
+                .ok_or(fmt::Error)?
+                .copy_from_slice(s.as_bytes());
+            self.len = end;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_inline_storage_into_fixed_buffer() {
+        let answer = 42;
+        let qs = QueryString::with_storage(InlinePairs::<2>::new())
+            .with("q", "🍎 apple")
+            .with("answer", &answer);
+
+        let mut out = FixedBuf {
+            bytes: [0; 64],
+            len: 0,
+        };
+        write!(out, "{qs}").unwrap();
+        let rendered = core::str::from_utf8(&out.bytes[..out.len]).unwrap();
+        assert_eq!(rendered, "?q=%F0%9F%8D%8E%20apple&answer=42");
+        assert_eq!(qs.encoded_len(), rendered.len());
+    }
+
+    #[test]
+    fn test_inline_storage_full() {
+        let qs = QueryString::with_storage(InlinePairs::<1>::new()).with("a", "1");
+        assert_eq!(qs.try_with("b", "2").err(), Some(CapacityError));
+    }
+}
+
+#[cfg(all(test, feature = "alloc"))]
 mod tests {
     use super::*;
 

@@ -2,6 +2,7 @@ version: '3'
 
 vars:
   MSRV: "1.87"
+  NO_STD_TARGET: riscv32imc-unknown-none-elf
 
 tasks:
   default:
@@ -66,6 +67,17 @@ tasks:
     cmds:
       - cargo +{{.MSRV}} check
 
+  check:no-std:
+    desc: Verify the crate builds for a bare-metal target ({{.NO_STD_TARGET}}), with and without alloc
+    aliases: [no-std]
+    preconditions:
+      - sh: rustup target list --installed | grep -q "{{.NO_STD_TARGET}}"
+        msg: "{{.NO_STD_TARGET}} target required — rustup target add {{.NO_STD_TARGET}}"
+    cmds:
+      - cargo clippy --target {{.NO_STD_TARGET}} --no-default-features -- -D warnings
+      - cargo clippy --target {{.NO_STD_TARGET}} -- -D warnings
+      - cargo test --lib --no-default-features
+
   bench:
     desc: Run criterion benchmarks
     preconditions:
@@ -91,6 +103,7 @@ tasks:
     desc: Full CI sequence (checks + tests + docs)
     cmds:
       - task: check
+      - task: check:no-std
       - task: test
       - task: docs
 

@@ -22,6 +22,12 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The crate is `#![no_std]`. The new default `alloc` feature gates
+  `QueryStringOwned`, the `Vec`-backed default storage and the
+  `String`-rendering helpers (`into_owned`, `write_into`). Without it,
+  `QueryString::with_storage` on `InlinePairs` builds and renders into any
+  `core::fmt::Write` sink. `percent-encoding` is used without its `std`
+  feature.
 - `QueryString<'a, S = Vec<Pair<'a>>>` is generic over its pair storage.
   `QueryString::inline::<N>()` keeps up to `N` pairs inline (`InlinePairs`)
   for building and rendering without any heap allocation;
@@ -49,6 +55,8 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   front, so it allocates once regardless of the value types.
 - `QueryString`'s `Debug` implementation no longer allocates a `String` per
   key and value; the output is unchanged.
+- CI and `task check:no-std` verify `no_std` builds on a bare-metal target
+  (`riscv32imc-unknown-none-elf`) with and without `alloc`.
 - New allocation-count tests (`tests/allocations.rs`) verify the
   zero-allocation claims, including heap-free inline building and rendering.
 
