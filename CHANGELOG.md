@@ -3,6 +3,37 @@
 All notable changes to this project will be documented in this file.
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed (breaking)
+
+- `QueryStringOwned` now percent-encodes keys and values eagerly into a single
+  internal `String` buffer instead of storing a `String` per key and value.
+  Building allocates only that buffer (amortized), and rendering is a single
+  `write_str`.
+- `QueryStringOwned::with`, `with_opt`, `push` and `push_opt` now take
+  `K: Display, V: Display` instead of `ToString`. Every type with a blanket
+  `ToString` implementation is still accepted.
+- `QueryStringOwned` equality now compares the encoded query string.
+- `QueryStringOwned`'s `Debug` output now shows the encoded buffer.
+- `QueryStringOwned::with`, `with_opt` and `append_into` are `#[must_use]`.
+
+### Added
+
+- `QueryStringOwned::with_capacity` and `capacity` for building without
+  reallocations.
+- `QueryStringOwned::as_str` and `into_string` (plus `AsRef<str>` and
+  `From<QueryStringOwned> for String`) to access the rendered query string
+  without formatting or copying.
+- `QueryStringOwned` implements `Hash`; `QueryStringOwned::new` is `const`.
+
+### Internal
+
+- `QueryString::into_owned` renders once into a buffer sized up front;
+  builders consisting only of `&str` parts convert with a single allocation.
+- New allocation-count tests (`tests/allocations.rs`) verify the
+  zero-allocation claims.
+
 ## [0.7.1] - 2026-06-05
 
 [0.7.1]: https://github.com/sunsided/query-string-builder/releases/tag/v0.7.1

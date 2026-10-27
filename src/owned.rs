@@ -1,14 +1,18 @@
-//! The owning, allocation-friendly query string builder.
+//! The owning query string builder, backed by a single encoded buffer.
 
-use crate::QUERY;
-use percent_encoding::utf8_percent_encode;
+use crate::encode::write_encoded;
 use std::fmt::{self, Display, Formatter, Write};
 
 /// An owning query string builder for percent encoding key-value pairs.
 ///
 /// This is the lifetime-free twin of [`QueryString`](crate::QueryString): it
-/// eagerly converts keys and values to owned [`String`]s, so it can be stored
-/// in structs, returned from functions and passed around freely.
+/// can be stored in structs, returned from functions and passed around freely.
+///
+/// Keys and values are percent-encoded eagerly, straight into a single
+/// internal [`String`] buffer — no per-pair strings are allocated. Use
+/// [`with_capacity`](Self::with_capacity) to build without any reallocation,
+/// and [`as_str`](Self::as_str) or [`into_string`](Self::into_string) to get
+/// the rendered query string without copying it.
 ///
 /// ## Example
 ///
@@ -25,19 +29,50 @@ use std::fmt::{self, Display, Formatter, Write};
 ///     "https://example.com/?q=apple&tasty=true&category=fruits%20and%20vegetables"
 /// );
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct QueryStringOwned {
-    pairs: Vec<(String, String)>,
+    /// The rendered query string, including the leading `?` unless empty.
+    buf: String,
+    /// The number of key-value pairs encoded into `buf`.
+    len: usize,
 }
 
 impl QueryStringOwned {
     /// Creates a new, empty query string builder.
-    pub fn new() -> Self {
-        Self { pairs: Vec::new() }
+    ///
+    /// This does not allocate.
+    pub const fn new() -> Self {
+        Self {
+            buf: String::new(),
+            len: 0,
+        }
     }
 
-    pub(crate) fn from_pairs(pairs: Vec<(String, String)>) -> Self {
-        Self { pairs }
+    /// Creates a new, empty query string builder whose buffer can hold at
+    /// least `capacity` bytes of rendered output without reallocating.
+    ///
+    /// The capacity refers to the *encoded* output, including the leading `?`
+    /// and the `=` and `&` separators.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryStringOwned;
+    ///
+    /// let qs = QueryStringOwned::with_capacity(32).with("q", "apple");
+    /// assert!(qs.capacity() >= 32);
+    /// assert_eq!(qs.as_str(), "?q=apple");
+    /// ```
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            buf: String::with_capacity(capacity),
+            len: 0,
+        }
+    }
+
+    /// Wraps an already rendered query string and its pair count.
+    pub(crate) fn from_rendered(buf: String, len: usize) -> Self {
+        Self { buf, len }
     }
 
     /// Appends a key-value pair to the query string.
@@ -58,8 +93,9 @@ impl QueryStringOwned {
     /// );
     /// ```
     #[doc(alias = "with_value")]
-    pub fn with<K: ToString, V: ToString>(mut self, key: K, value: V) -> Self {
-        self.pairs.push((key.to_string(), value.to_string()));
+    #[must_use]
+    pub fn with<K: Display, V: Display>(mut self, key: K, value: V) -> Self {
+        self.push(key, value);
         self
     }
 
@@ -82,7 +118,8 @@ impl QueryStringOwned {
     /// );
     /// ```
     #[doc(alias = "with_opt_value")]
-    pub fn with_opt<K: ToString, V: ToString>(self, key: K, value: Option<V>) -> Self {
+    #[must_use]
+    pub fn with_opt<K: Display, V: Display>(self, key: K, value: Option<V>) -> Self {
         if let Some(value) = value {
             self.with(key, value)
         } else {
@@ -91,6 +128,11 @@ impl QueryStringOwned {
     }
 
     /// Appends a key-value pair to the query string.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if a [`Display`] implementation of `key` or `value` returns an
+    /// error, just like [`ToString::to_string`] does.
     ///
     /// ## Example
     ///
@@ -106,8 +148,13 @@ impl QueryStringOwned {
     ///     "https://example.com/?q=apple&category=fruits%20and%20vegetables"
     /// );
     /// ```
-    pub fn push<K: ToString, V: ToString>(&mut self, key: K, value: V) -> &mut Self {
-        self.pairs.push((key.to_string(), value.to_string()));
+    pub fn push<K: Display, V: Display>(&mut self, key: K, value: V) -> &mut Self {
+        self.buf.push(if self.len == 0 { '?' } else { '&' });
+        write_encoded(&mut self.buf, &key)
+            .and_then(|()| self.buf.write_char('='))
+            .and_then(|()| write_encoded(&mut self.buf, &value))
+            .expect("a Display implementation returned an error unexpectedly");
+        self.len += 1;
         self
     }
 
@@ -127,7 +174,7 @@ impl QueryStringOwned {
     ///     "https://example.com/?q=%F0%9F%8D%8E%20apple"
     /// );
     /// ```
-    pub fn push_opt<K: ToString, V: ToString>(&mut self, key: K, value: Option<V>) -> &mut Self {
+    pub fn push_opt<K: Display, V: Display>(&mut self, key: K, value: Option<V>) -> &mut Self {
         if let Some(value) = value {
             self.push(key, value)
         } else {
@@ -137,12 +184,52 @@ impl QueryStringOwned {
 
     /// Determines the number of key-value pairs currently in the builder.
     pub fn len(&self) -> usize {
-        self.pairs.len()
+        self.len
     }
 
     /// Determines if the builder is currently empty.
     pub fn is_empty(&self) -> bool {
-        self.pairs.is_empty()
+        self.len == 0
+    }
+
+    /// Returns the number of bytes the internal buffer can hold without
+    /// reallocating.
+    pub fn capacity(&self) -> usize {
+        self.buf.capacity()
+    }
+
+    /// Returns the rendered query string, including the leading `?`.
+    ///
+    /// An empty builder renders as the empty string. This is identical to
+    /// the [`Display`] output but borrows the internal buffer instead of
+    /// formatting.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryStringOwned;
+    ///
+    /// let qs = QueryStringOwned::new().with("q", "🍎");
+    /// assert_eq!(qs.as_str(), "?q=%F0%9F%8D%8E");
+    /// assert_eq!(QueryStringOwned::new().as_str(), "");
+    /// ```
+    pub fn as_str(&self) -> &str {
+        &self.buf
+    }
+
+    /// Consumes the builder and returns the rendered query string, including
+    /// the leading `?`, without copying it.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryStringOwned;
+    ///
+    /// let url = QueryStringOwned::new().with("q", "apple").into_string();
+    /// assert_eq!(url, "?q=apple");
+    /// ```
+    pub fn into_string(self) -> String {
+        self.buf
     }
 
     /// Appends another query string builder's values.
@@ -162,8 +249,23 @@ impl QueryStringOwned {
     ///     "https://example.com/?q=apple&q=pear"
     /// );
     /// ```
-    pub fn append(&mut self, mut other: QueryStringOwned) {
-        self.pairs.append(&mut other.pairs)
+    pub fn append(&mut self, other: QueryStringOwned) {
+        if other.is_empty() {
+            return;
+        }
+        if self.is_empty() {
+            // Reuse the other buffer instead of copying into an empty one,
+            // unless ours was pre-sized to hold the result.
+            if self.buf.capacity() < other.buf.len() {
+                *self = other;
+                return;
+            }
+            self.buf.push_str(&other.buf);
+        } else {
+            self.buf.push('&');
+            self.buf.push_str(&other.buf[1..]);
+        }
+        self.len += other.len;
     }
 
     /// Appends another query string builder's values, consuming both types.
@@ -183,27 +285,28 @@ impl QueryStringOwned {
     ///     "https://example.com/?q=apple&q=pear"
     /// );
     /// ```
-    pub fn append_into(mut self, mut other: QueryStringOwned) -> Self {
-        self.pairs.append(&mut other.pairs);
+    #[must_use]
+    pub fn append_into(mut self, other: QueryStringOwned) -> Self {
+        self.append(other);
         self
     }
 }
 
 impl Display for QueryStringOwned {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if self.pairs.is_empty() {
-            return Ok(());
-        }
-        f.write_char('?')?;
-        for (i, (key, value)) in self.pairs.iter().enumerate() {
-            if i > 0 {
-                f.write_char('&')?;
-            }
-            Display::fmt(&utf8_percent_encode(key, QUERY), f)?;
-            f.write_char('=')?;
-            Display::fmt(&utf8_percent_encode(value, QUERY), f)?;
-        }
-        Ok(())
+        f.write_str(&self.buf)
+    }
+}
+
+impl AsRef<str> for QueryStringOwned {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl From<QueryStringOwned> for String {
+    fn from(qs: QueryStringOwned) -> Self {
+        qs.into_string()
     }
 }
 
@@ -291,6 +394,40 @@ mod tests {
             format!("https://example.com/{qs}"),
             "https://example.com/?q=apple&q=pear&answer=42"
         );
+    }
+
+    #[test]
+    fn test_append_empty_sides() {
+        let mut qs = QueryStringOwned::new();
+        qs.append(QueryStringOwned::new());
+        assert_eq!(qs.as_str(), "");
+        assert!(qs.is_empty());
+
+        qs.append(QueryStringOwned::new().with("a", 1));
+        qs.append(QueryStringOwned::new());
+        assert_eq!(qs.as_str(), "?a=1");
+        assert_eq!(qs.len(), 1);
+
+        let mut sized = QueryStringOwned::with_capacity(64);
+        sized.append(QueryStringOwned::new().with("b", 2).with("c", 3));
+        assert_eq!(sized.as_str(), "?b=2&c=3");
+        assert_eq!(sized.len(), 2);
+        assert!(sized.capacity() >= 64);
+    }
+
+    #[test]
+    fn test_as_str_matches_display() {
+        let qs = QueryStringOwned::new().with("q", "a b").with("n", 1);
+        assert_eq!(qs.as_str(), qs.to_string());
+        assert_eq!(String::from(qs), "?q=a%20b&n=1");
+    }
+
+    #[test]
+    fn test_with_capacity_does_not_reallocate() {
+        let qs = QueryStringOwned::with_capacity(64);
+        let ptr = qs.as_str().as_ptr();
+        let qs = qs.with("q", "apple").with("n", 42);
+        assert_eq!(qs.as_str().as_ptr(), ptr);
     }
 
     #[test]

@@ -10,8 +10,9 @@
 //!   format the query string in one place.
 //! - [`QueryStringOwned`] owns its data and has no lifetime parameter. Use it
 //!   when you want to store the builder in a struct or return it from a
-//!   function. A borrowing builder can be converted via
-//!   [`QueryString::into_owned`].
+//!   function. It encodes eagerly into a single buffer, so building
+//!   allocates nothing beyond that buffer. A borrowing builder can be
+//!   converted via [`QueryString::into_owned`].
 //!
 //! ## Example
 //!

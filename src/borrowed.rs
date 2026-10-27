@@ -40,6 +40,15 @@ impl Part<'_> {
             Part::Display(d) => write_encoded(f, *d),
         }
     }
+
+    /// Returns the exact encoded length for string slices, and zero for
+    /// [`Display`] values whose length is unknown until rendered.
+    fn encoded_len_hint(&self) -> usize {
+        match self {
+            Part::Str(s) => utf8_percent_encode(s, QUERY).map(str::len).sum(),
+            Part::Display(_) => 0,
+        }
+    }
 }
 
 /// Conversion into a borrowed query string [`Part`].
@@ -288,7 +297,7 @@ impl<'a> QueryString<'a> {
     }
 
     /// Converts this borrowing builder into a [`QueryStringOwned`] by rendering
-    /// each key and value to an owned [`String`].
+    /// it once into the owned builder's buffer.
     ///
     /// Useful for building cheaply with borrows and then storing or returning
     /// the result past the borrows' lifetimes.
@@ -306,12 +315,24 @@ impl<'a> QueryString<'a> {
     /// assert_eq!(qs.to_string(), "?q=apple");
     /// ```
     pub fn into_owned(self) -> QueryStringOwned {
-        QueryStringOwned::from_pairs(
-            self.pairs
-                .into_iter()
-                .map(|(key, value)| (key.to_string(), value.to_string()))
-                .collect(),
-        )
+        let mut buf = String::with_capacity(self.encoded_len_hint());
+        write!(buf, "{self}").expect("a Display implementation returned an error unexpectedly");
+        QueryStringOwned::from_rendered(buf, self.pairs.len())
+    }
+
+    /// Returns a lower bound of the rendered length in bytes, exact when all
+    /// keys and values are plain string slices.
+    fn encoded_len_hint(&self) -> usize {
+        if self.pairs.is_empty() {
+            return 0;
+        }
+        // The leading '?', one '=' per pair and one '&' between pairs.
+        let separators = 2 * self.pairs.len();
+        self.pairs
+            .iter()
+            .map(|(key, value)| key.encoded_len_hint() + value.encoded_len_hint())
+            .sum::<usize>()
+            + separators
     }
 }
 
@@ -508,6 +529,17 @@ mod tests {
         };
         assert_eq!(owned.to_string(), "?q=Gr%C3%BCnkohl");
         assert_eq!(owned.len(), 1);
+    }
+
+    #[test]
+    fn test_into_owned_exact_capacity() {
+        let qs = QueryString::new()
+            .with("q", "apple???")
+            .with("category", "fruits and vegetables");
+        let rendered = qs.to_string();
+        let owned = qs.into_owned();
+        assert_eq!(owned.as_str(), rendered);
+        assert_eq!(owned.capacity(), rendered.len());
     }
 
     #[test]

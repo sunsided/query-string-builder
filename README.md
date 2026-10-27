@@ -38,7 +38,9 @@ fn main() {
 
 If you want to store the query string in a struct or return it from a function
 without dealing with lifetimes, use `QueryStringOwned` — the same API, but it
-eagerly converts keys and values to owned `String`s:
+percent-encodes keys and values eagerly into a single internal buffer. Pre-size
+it with `with_capacity` to build with exactly one allocation, and take the
+result with `as_str()` or `into_string()` without formatting or copying:
 
 ```rust
 use query_string_builder::QueryStringOwned;
@@ -48,6 +50,16 @@ fn build_query() -> QueryStringOwned {
         .with("q", "apple")
         .with("answer", 42)
 }
+```
+
+```rust
+use query_string_builder::QueryStringOwned;
+
+let url = QueryStringOwned::with_capacity(64)
+    .with("q", "apple")
+    .with("answer", 42)
+    .into_string();
+assert_eq!(url, "?q=apple&answer=42");
 ```
 
 A borrowing builder can also be converted with `qs.into_owned()`.
