@@ -71,6 +71,28 @@ proptest! {
         prop_assert_eq!(qs.encoded_len(), qs.to_string().len());
     }
 
+    /// The allocation-free `Debug` output matches debug-formatting the
+    /// rendered keys and values as strings, for any chunking.
+    #[test]
+    fn debug_matches_string_debug((s, splits) in string_with_splits(), pairs in pairs()) {
+        let chunked = ChunkedStr { s: &s, splits };
+        let mut qs = QueryString::new().with(&chunked, s.as_str());
+        let mut expected = vec![(s.clone(), s.clone())];
+        for (key, value) in &pairs {
+            qs.push(key.as_str(), value);
+            expected.push((key.clone(), value.clone()));
+        }
+
+        struct DebugPairs<'a>(&'a [(String, String)]);
+        impl fmt::Debug for DebugPairs<'_> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                f.debug_map().entries(self.0.iter().map(|(k, v)| (k, v))).finish()
+            }
+        }
+        prop_assert_eq!(format!("{qs:?}"), format!("{:?}", DebugPairs(&expected)));
+        prop_assert_eq!(format!("{qs:#?}"), format!("{:#?}", DebugPairs(&expected)));
+    }
+
     /// Percent-decoding the rendered output recovers the original pairs.
     #[test]
     fn roundtrip_decode(pairs in pairs()) {

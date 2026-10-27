@@ -191,3 +191,16 @@ fn borrowed_into_owned_with_display_values_allocates_once() {
     assert_eq!(allocations, 1, "Display values are measured, not guessed");
     assert_eq!(owned.capacity(), owned.as_str().len());
 }
+
+#[test]
+fn borrowed_debug_does_not_allocate() {
+    let answer = 42;
+    let qs = QueryString::inline::<2>()
+        .with("q", r#"🍎 "apple""#)
+        .with("answer", &answer);
+    let mut out = String::with_capacity(128);
+
+    let ((), allocations) = count(|| write!(out, "{qs:?}").unwrap());
+    assert_eq!(allocations, 0);
+    assert_eq!(out, r#"{"q": "🍎 \"apple\"", "answer": "42"}"#);
+}

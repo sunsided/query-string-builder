@@ -32,6 +32,7 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   panicking when fixed-capacity storage is full.
 - `QueryString::encoded_len` returns the exact rendered length without
   allocating; `Display` values are formatted into a byte counter.
+- `Part` implements `Debug`, formatting like a string literal.
 - `QueryString::write_into` appends the rendered query string to a `String`
   with a single exact reservation, e.g. onto a base URL.
 - `QueryStringOwned::with_capacity` and `capacity` for building without
@@ -46,6 +47,8 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `QueryString::into_owned` renders once into a buffer sized exactly up
   front, so it allocates once regardless of the value types.
+- `QueryString`'s `Debug` implementation no longer allocates a `String` per
+  key and value; the output is unchanged.
 - New allocation-count tests (`tests/allocations.rs`) verify the
   zero-allocation claims, including heap-free inline building and rendering.
 

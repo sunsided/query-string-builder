@@ -28,6 +28,44 @@ impl Display for Part<'_> {
     }
 }
 
+/// Formats the part like a string literal, exactly as `str`'s [`Debug`]
+/// implementation would, without allocating.
+impl Debug for Part<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Part::Str(s) => Debug::fmt(s, f),
+            Part::Display(d) => {
+                f.write_char('"')?;
+                write!(DebugEscapeWriter { inner: f }, "{d}")?;
+                f.write_char('"')
+            }
+        }
+    }
+}
+
+/// A [`fmt::Write`] adapter that escapes every chunk written through it the
+/// way `str`'s [`Debug`] implementation escapes string contents.
+struct DebugEscapeWriter<'f, 'a> {
+    inner: &'f mut Formatter<'a>,
+}
+
+impl Write for DebugEscapeWriter<'_, '_> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for c in s.chars() {
+            // `str`'s `Debug` escapes like `char::escape_debug`, except that
+            // it leaves single quotes alone.
+            if c == '\'' {
+                self.inner.write_char(c)?;
+            } else {
+                for escaped in c.escape_debug() {
+                    self.inner.write_char(escaped)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Part<'_> {
     /// Writes this part into the formatter, percent-encoded, without
     /// allocating intermediate strings.
@@ -576,7 +614,7 @@ impl<'a, S: PairStorage<'a>> Debug for QueryString<'a, S> {
                 self.pairs
                     .as_slice()
                     .iter()
-                    .map(|(key, value)| (key.to_string(), value.to_string())),
+                    .map(|(key, value)| (key, value)),
             )
             .finish()
     }
@@ -852,6 +890,51 @@ mod tests {
     fn test_debug() {
         let qs = QueryString::new().with("q", "apple");
         assert_eq!(format!("{qs:?}"), r#"{"q": "apple"}"#);
+    }
+
+    #[test]
+    fn test_debug_display_values_escaped() {
+        struct Quoted;
+        impl Display for Quoted {
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                f.write_str(r#"it's "quoted""#)?;
+                f.write_str("\n\t")?;
+                f.write_str(r"\")
+            }
+        }
+
+        let answer = 42;
+        let qs = QueryString::new()
+            .with("answer", &answer)
+            .with(&Quoted, r#"s'q""#);
+        let expected = format!(
+            "{:?}",
+            std::collections::BTreeMap::from([
+                ("answer".to_string(), "42".to_string()),
+                (Quoted.to_string(), r#"s'q""#.to_string()),
+            ])
+        );
+        assert_eq!(format!("{qs:?}"), expected);
+    }
+
+    #[test]
+    fn test_debug_pretty() {
+        let answer = 42;
+        let qs = QueryString::new().with("q", "a").with("n", &answer);
+        assert_eq!(
+            format!("{qs:#?}"),
+            r#"{
+    "q": "a",
+    "n": "42",
+}"#
+        );
+    }
+
+    #[test]
+    fn test_part_debug() {
+        let tasty = true;
+        assert_eq!(format!("{:?}", r#"a"b"#.into_part()), r#""a\"b""#);
+        assert_eq!(format!("{:?}", (&tasty).into_part()), r#""true""#);
     }
 
     #[test]
