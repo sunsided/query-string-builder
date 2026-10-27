@@ -36,6 +36,33 @@ pub(crate) fn write_encoded<W: Write + ?Sized>(out: &mut W, value: &dyn Display)
     write!(writer, "{value}")
 }
 
+/// A [`fmt::Write`] sink that only counts the bytes written to it.
+struct ByteCounter(usize);
+
+impl Write for ByteCounter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.0 += s.len();
+        Ok(())
+    }
+}
+
+/// Returns the length of `s` once percent-encoded.
+pub(crate) fn encoded_str_len(s: &str) -> usize {
+    utf8_percent_encode(s, QUERY).map(str::len).sum()
+}
+
+/// Returns the length of `value` once rendered and percent-encoded, by
+/// formatting it into a counter instead of a buffer.
+///
+/// Returns zero if the [`Display`] implementation fails.
+pub(crate) fn encoded_len(value: &dyn Display) -> usize {
+    let mut counter = ByteCounter(0);
+    match write_encoded(&mut counter, value) {
+        Ok(()) => counter.0,
+        Err(fmt::Error) => 0,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -64,6 +91,13 @@ mod tests {
     #[test]
     fn test_chunked_encoding() {
         assert_eq!(Wrapper(Chunked).to_string(), "Gr%C3%BCnkohl%20%26%20more");
+    }
+
+    #[test]
+    fn test_encoded_len() {
+        assert_eq!(encoded_len(&Chunked), "Gr%C3%BCnkohl%20%26%20more".len());
+        assert_eq!(encoded_str_len("a b"), "a%20b".len());
+        assert_eq!(encoded_len(&42), 2);
     }
 
     #[test]

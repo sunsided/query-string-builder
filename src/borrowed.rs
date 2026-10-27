@@ -1,6 +1,6 @@
 //! The borrowing, zero-allocation query string builder.
 
-use crate::encode::write_encoded;
+use crate::encode::{encoded_len, encoded_str_len, write_encoded};
 use crate::storage::{CapacityError, InlinePairs, Pair, PairStorage};
 use crate::{QUERY, QueryStringOwned};
 use percent_encoding::utf8_percent_encode;
@@ -43,12 +43,13 @@ impl Part<'_> {
         }
     }
 
-    /// Returns the exact encoded length for string slices, and zero for
-    /// [`Display`] values whose length is unknown until rendered.
-    fn encoded_len_hint(&self) -> usize {
+    /// Returns the length of this part once percent-encoded.
+    ///
+    /// [`Display`] values are formatted into a byte counter, not a buffer.
+    fn encoded_len(&self) -> usize {
         match self {
-            Part::Str(s) => utf8_percent_encode(s, QUERY).map(str::len).sum(),
-            Part::Display(_) => 0,
+            Part::Str(s) => encoded_str_len(s),
+            Part::Display(d) => encoded_len(*d),
         }
     }
 }
@@ -487,14 +488,29 @@ impl<'a, S: PairStorage<'a>> QueryString<'a, S> {
     /// assert_eq!(qs.to_string(), "?q=apple");
     /// ```
     pub fn into_owned(self) -> QueryStringOwned {
-        let mut buf = String::with_capacity(self.encoded_len_hint());
-        write!(buf, "{self}").expect("a Display implementation returned an error unexpectedly");
+        let mut buf = String::new();
+        self.write_into(&mut buf);
         QueryStringOwned::from_rendered(buf, self.len())
     }
 
-    /// Returns a lower bound of the rendered length in bytes, exact when all
-    /// keys and values are plain string slices.
-    fn encoded_len_hint(&self) -> usize {
+    /// Returns the length of the rendered query string in bytes, including
+    /// the leading `?`.
+    ///
+    /// This does not allocate: string slices are measured directly, and other
+    /// [`Display`] values are formatted into a byte counter. It is exact as
+    /// long as each value renders the same way every time it is formatted.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryString;
+    ///
+    /// let answer = 42;
+    /// let qs = QueryString::new().with("q", "a b").with("answer", &answer);
+    /// assert_eq!(qs.encoded_len(), "?q=a%20b&answer=42".len());
+    /// assert_eq!(QueryString::new().encoded_len(), 0);
+    /// ```
+    pub fn encoded_len(&self) -> usize {
         let pairs = self.pairs.as_slice();
         if pairs.is_empty() {
             return 0;
@@ -503,9 +519,34 @@ impl<'a, S: PairStorage<'a>> QueryString<'a, S> {
         let separators = 2 * pairs.len();
         pairs
             .iter()
-            .map(|(key, value)| key.encoded_len_hint() + value.encoded_len_hint())
+            .map(|(key, value)| key.encoded_len() + value.encoded_len())
             .sum::<usize>()
             + separators
+    }
+
+    /// Appends the rendered query string to `out`, reserving the exact
+    /// required capacity up front.
+    ///
+    /// Unlike `format!` or [`ToString::to_string`], which grow the target
+    /// string as they go, this reallocates `out` at most once.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if a [`Display`] implementation of a key or value returns an
+    /// error, just like [`ToString::to_string`] does.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use query_string_builder::QueryString;
+    ///
+    /// let mut url = String::from("https://example.com/");
+    /// QueryString::new().with("q", "apple").write_into(&mut url);
+    /// assert_eq!(url, "https://example.com/?q=apple");
+    /// ```
+    pub fn write_into(&self, out: &mut String) {
+        out.reserve(self.encoded_len());
+        write!(out, "{self}").expect("a Display implementation returned an error unexpectedly");
     }
 }
 
@@ -704,6 +745,40 @@ mod tests {
         };
         assert_eq!(owned.to_string(), "?q=Gr%C3%BCnkohl");
         assert_eq!(owned.len(), 1);
+    }
+
+    #[test]
+    fn test_encoded_len_matches_rendering() {
+        let count = 12i32;
+        let weight = 99.9f64;
+        let qs = QueryString::new()
+            .with("q", "Grünkohl & more")
+            .with("count", &count)
+            .with(&weight, "=");
+        assert_eq!(qs.encoded_len(), qs.to_string().len());
+    }
+
+    #[test]
+    fn test_write_into_appends() {
+        let tasty = true;
+        let mut url = String::from("https://example.com/");
+        QueryString::inline::<1>()
+            .with("tasty", &tasty)
+            .write_into(&mut url);
+        assert_eq!(url, "https://example.com/?tasty=true");
+
+        let mut url = String::from("unchanged");
+        QueryString::new().write_into(&mut url);
+        assert_eq!(url, "unchanged");
+    }
+
+    #[test]
+    fn test_into_owned_exact_capacity_display() {
+        let answer = 42;
+        let qs = QueryString::new().with("q", "a b").with("answer", &answer);
+        let rendered = qs.to_string();
+        let owned = qs.into_owned();
+        assert_eq!(owned.capacity(), rendered.len());
     }
 
     #[test]

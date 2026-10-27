@@ -30,6 +30,10 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `QueryString::with_capacity` pre-sizes the default `Vec` storage.
 - `QueryString::try_with` and `try_push` return `CapacityError` instead of
   panicking when fixed-capacity storage is full.
+- `QueryString::encoded_len` returns the exact rendered length without
+  allocating; `Display` values are formatted into a byte counter.
+- `QueryString::write_into` appends the rendered query string to a `String`
+  with a single exact reservation, e.g. onto a base URL.
 - `QueryStringOwned::with_capacity` and `capacity` for building without
   reallocations.
 - `QueryStringOwned::as_str` and `into_string` (plus `AsRef<str>` and
@@ -40,8 +44,8 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Internal
 
-- `QueryString::into_owned` renders once into a buffer sized up front;
-  builders consisting only of `&str` parts convert with a single allocation.
+- `QueryString::into_owned` renders once into a buffer sized exactly up
+  front, so it allocates once regardless of the value types.
 - New allocation-count tests (`tests/allocations.rs`) verify the
   zero-allocation claims, including heap-free inline building and rendering.
 

@@ -23,6 +23,17 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("borrowed_write_into", |b| {
+        b.iter(|| {
+            let qs = QueryString::inline::<2>()
+                .with("q", "apple???")
+                .with("category", "fruits and vegetables");
+            let mut out = String::new();
+            qs.write_into(&mut out);
+            black_box(out)
+        })
+    });
+
     c.bench_function("owned_with", |b| {
         b.iter(|| {
             let qs = QueryStringOwned::new()

@@ -148,3 +148,46 @@ fn borrowed_with_capacity_builds_with_one_allocation() {
     assert_eq!(allocations, 1, "only the up-front pair allocation");
     assert_eq!(qs.len(), 4);
 }
+
+#[test]
+fn borrowed_encoded_len_does_not_allocate() {
+    let answer = 42;
+    let weight = 99.9;
+    let qs = QueryString::inline::<3>()
+        .with("q", "🍎 apple")
+        .with("answer", &answer)
+        .with("weight", &weight);
+
+    let (len, allocations) = count(|| qs.encoded_len());
+    assert_eq!(allocations, 0);
+    assert_eq!(len, qs.to_string().len());
+}
+
+#[test]
+fn borrowed_write_into_reserves_once() {
+    let answer = 42;
+    let weight = 99.9;
+    let qs = QueryString::inline::<3>()
+        .with("q", "🍎 apple and a long description to force growth")
+        .with("answer", &answer)
+        .with("weight", &weight);
+    let mut url = String::from("https://example.com/");
+
+    let ((), allocations) = count(|| qs.write_into(&mut url));
+    assert_eq!(allocations, 1, "a single exact reserve");
+    assert_eq!(url, format!("https://example.com/{qs}"));
+}
+
+#[test]
+fn borrowed_into_owned_with_display_values_allocates_once() {
+    let answer = 42;
+    let weight = 99.9;
+    let qs = QueryString::inline::<3>()
+        .with("q", "apple???")
+        .with("answer", &answer)
+        .with("weight", &weight);
+
+    let (owned, allocations) = count(|| qs.into_owned());
+    assert_eq!(allocations, 1, "Display values are measured, not guessed");
+    assert_eq!(owned.capacity(), owned.as_str().len());
+}

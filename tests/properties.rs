@@ -59,6 +59,18 @@ proptest! {
         prop_assert_eq!(via_chunks, via_str);
     }
 
+    /// `encoded_len` predicts the rendered length exactly, for plain strings
+    /// and for Display values writing in arbitrary chunks.
+    #[test]
+    fn encoded_len_is_exact((s, splits) in string_with_splits(), pairs in pairs()) {
+        let chunked = ChunkedStr { s: &s, splits };
+        let mut qs = QueryString::new().with(&chunked, &chunked);
+        for (key, value) in &pairs {
+            qs.push(key.as_str(), value.as_str());
+        }
+        prop_assert_eq!(qs.encoded_len(), qs.to_string().len());
+    }
+
     /// Percent-decoding the rendered output recovers the original pairs.
     #[test]
     fn roundtrip_decode(pairs in pairs()) {

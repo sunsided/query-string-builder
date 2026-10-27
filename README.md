@@ -34,6 +34,20 @@ fn main() {
 }
 ```
 
+To append the query string to an existing URL with a single, exactly sized
+reservation (instead of the repeated growth of `format!`), use `write_into`;
+`encoded_len` gives the exact length without allocating:
+
+```rust
+use query_string_builder::QueryString;
+
+let mut url = String::from("https://example.com/");
+let qs = QueryString::new().with("q", "apple");
+assert_eq!(qs.encoded_len(), 8);
+qs.write_into(&mut url);
+assert_eq!(url, "https://example.com/?q=apple");
+```
+
 ## No heap at all
 
 The borrowing builder can keep its pairs inline instead of in a `Vec`.
