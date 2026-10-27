@@ -101,6 +101,17 @@ mod tests {
     }
 
     #[test]
+    fn test_encoded_len_of_failing_display() {
+        struct Failing;
+        impl Display for Failing {
+            fn fmt(&self, _: &mut Formatter<'_>) -> fmt::Result {
+                Err(fmt::Error)
+            }
+        }
+        assert_eq!(encoded_len(&Failing), 0);
+    }
+
+    #[test]
     fn test_encode_into_string() {
         let mut out = String::from("?k=");
         write_encoded(&mut out, &Chunked).unwrap();

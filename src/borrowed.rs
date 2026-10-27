@@ -685,6 +685,32 @@ mod core_tests {
     }
 
     #[test]
+    fn test_try_with_success() {
+        let qs = QueryString::with_storage(InlinePairs::<2>::new())
+            .try_with("a", "1")
+            .and_then(|qs| qs.try_with("b", "2"))
+            .unwrap();
+        assert_eq!(qs.len(), 2);
+        assert_eq!(qs.encoded_len(), "?a=1&b=2".len());
+    }
+
+    #[test]
+    fn test_part_display_is_unencoded() {
+        struct Collect(String);
+        impl Write for Collect {
+            fn write_str(&mut self, s: &str) -> fmt::Result {
+                self.0.push_str(s);
+                Ok(())
+            }
+        }
+
+        let answer = 42;
+        let mut out = Collect(String::new());
+        write!(out, "{}|{}", "a b".into_part(), (&answer).into_part()).unwrap();
+        assert_eq!(out.0, "a b|42");
+    }
+
+    #[test]
     fn test_inline_storage_full() {
         let qs = QueryString::with_storage(InlinePairs::<1>::new()).with("a", "1");
         assert_eq!(qs.try_with("b", "2").err(), Some(CapacityError));

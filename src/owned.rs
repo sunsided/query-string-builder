@@ -420,6 +420,7 @@ mod tests {
     fn test_as_str_matches_display() {
         let qs = QueryStringOwned::new().with("q", "a b").with("n", 1);
         assert_eq!(qs.as_str(), qs.to_string());
+        assert_eq!(AsRef::<str>::as_ref(&qs), qs.as_str());
         assert_eq!(String::from(qs), "?q=a%20b&n=1");
     }
 
