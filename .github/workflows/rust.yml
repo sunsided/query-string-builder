@@ -54,6 +54,22 @@ jobs:
       - name: Run doctests
         run: cargo test --doc --verbose ${{ matrix.features }}
 
+  no_std:
+    needs: lint
+    name: Build no_std
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: riscv32imc-unknown-none-elf
+      - name: Check without alloc
+        run: cargo check --verbose --target riscv32imc-unknown-none-elf --no-default-features
+      - name: Check with alloc
+        run: cargo check --verbose --target riscv32imc-unknown-none-elf
+      - name: Run core-only tests
+        run: cargo test --verbose --lib --no-default-features
+
   codecov:
     needs: lint
     name: Code Coverage

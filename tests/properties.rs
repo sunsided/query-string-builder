@@ -59,6 +59,40 @@ proptest! {
         prop_assert_eq!(via_chunks, via_str);
     }
 
+    /// `encoded_len` predicts the rendered length exactly, for plain strings
+    /// and for Display values writing in arbitrary chunks.
+    #[test]
+    fn encoded_len_is_exact((s, splits) in string_with_splits(), pairs in pairs()) {
+        let chunked = ChunkedStr { s: &s, splits };
+        let mut qs = QueryString::new().with(&chunked, &chunked);
+        for (key, value) in &pairs {
+            qs.push(key.as_str(), value.as_str());
+        }
+        prop_assert_eq!(qs.encoded_len(), qs.to_string().len());
+    }
+
+    /// The allocation-free `Debug` output matches debug-formatting the
+    /// rendered keys and values as strings, for any chunking.
+    #[test]
+    fn debug_matches_string_debug((s, splits) in string_with_splits(), pairs in pairs()) {
+        let chunked = ChunkedStr { s: &s, splits };
+        let mut qs = QueryString::new().with(&chunked, s.as_str());
+        let mut expected = vec![(s.clone(), s.clone())];
+        for (key, value) in &pairs {
+            qs.push(key.as_str(), value);
+            expected.push((key.clone(), value.clone()));
+        }
+
+        struct DebugPairs<'a>(&'a [(String, String)]);
+        impl fmt::Debug for DebugPairs<'_> {
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                f.debug_map().entries(self.0.iter().map(|(k, v)| (k, v))).finish()
+            }
+        }
+        prop_assert_eq!(format!("{qs:?}"), format!("{:?}", DebugPairs(&expected)));
+        prop_assert_eq!(format!("{qs:#?}"), format!("{:#?}", DebugPairs(&expected)));
+    }
+
     /// Percent-decoding the rendered output recovers the original pairs.
     #[test]
     fn roundtrip_decode(pairs in pairs()) {
@@ -82,16 +116,20 @@ proptest! {
         prop_assert_eq!(decoded, pairs);
     }
 
-    /// Borrowed and owned builders render identically; `into_owned` preserves output.
+    /// Vec-backed, inline and owned builders render identically; `into_owned`
+    /// preserves output.
     #[test]
     fn owned_borrowed_equivalence(pairs in pairs()) {
         let mut borrowed = QueryString::new();
+        let mut inline = QueryString::inline::<8>();
         let mut owned = QueryStringOwned::new();
         for (key, value) in &pairs {
             borrowed.push(key.as_str(), value.as_str());
+            inline.push(key.as_str(), value.as_str());
             owned.push(key, value);
         }
         let rendered = borrowed.to_string();
+        prop_assert_eq!(&rendered, &inline.to_string());
         prop_assert_eq!(&rendered, &owned.to_string());
         prop_assert_eq!(&rendered, &borrowed.into_owned().to_string());
     }

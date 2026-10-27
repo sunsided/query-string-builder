@@ -11,14 +11,28 @@ categories = ["web-programming::http-client"]
 readme = "README.md"
 license = "EUPL-1.2"
 
+[features]
+default = ["alloc"]
+# QueryStringOwned, Vec-backed pair storage and rendering into a String.
+alloc = []
+
 [dependencies]
-percent-encoding = { version = "2.3.2", default-features = false, features = ["std"] }
+percent-encoding = { version = "2.3.2", default-features = false }
 
 [dev-dependencies]
 criterion = "0.5.1"
 percent-encoding = "2.3.2"
 proptest = "1"
 
+[[test]]
+name = "allocations"
+required-features = ["alloc"]
+
+[[test]]
+name = "properties"
+required-features = ["alloc"]
+
 [[bench]]
 name = "bench"
 harness = false
+required-features = ["alloc"]

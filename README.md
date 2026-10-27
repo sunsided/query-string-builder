@@ -11,7 +11,7 @@ The initial `?` question mark is automatically prepended.
 
 `QueryString` borrows its keys and values and allocates **no strings at all** —
 neither while building nor while rendering. Only the pair list itself is a
-single `Vec` allocation:
+single `Vec` allocation (see below to avoid even that):
 
 ```rust
 use query_string_builder::QueryString;
@@ -34,11 +34,68 @@ fn main() {
 }
 ```
 
+To append the query string to an existing URL with a single, exactly sized
+reservation (instead of the repeated growth of `format!`), use `write_into`;
+`encoded_len` gives the exact length without allocating:
+
+```rust
+use query_string_builder::QueryString;
+
+let mut url = String::from("https://example.com/");
+let qs = QueryString::new().with("q", "apple");
+assert_eq!(qs.encoded_len(), 8);
+qs.write_into(&mut url);
+assert_eq!(url, "https://example.com/?q=apple");
+```
+
+## No heap at all
+
+The borrowing builder can keep its pairs inline instead of in a `Vec`.
+`QueryString::inline::<N>()` holds up to `N` pairs without touching the heap;
+`try_with`/`try_push` report a full builder instead of panicking:
+
+```rust
+use query_string_builder::QueryString;
+
+let answer = 42;
+let qs = QueryString::inline::<2>()
+    .with("q", "apple")
+    .with("answer", &answer);
+
+assert_eq!(qs.to_string(), "?q=apple&answer=42");
+```
+
+Any other collection — e.g. `heapless::Vec` or `arrayvec::ArrayVec` — can be
+plugged in by implementing `PairStorage` and passing it to
+`QueryString::with_storage`.
+
+## `no_std`
+
+The crate is `#![no_std]`. Its default `alloc` feature provides
+`QueryStringOwned` and the `Vec`-backed storage; disable default features to
+use it on targets without an allocator, building on `InlinePairs` and rendering
+into any `core::fmt::Write` sink:
+
+```toml
+query-string-builder = { version = "0.8", default-features = false }
+```
+
+```rust,ignore
+use query_string_builder::{InlinePairs, QueryString};
+
+let qs = QueryString::with_storage(InlinePairs::<2>::new())
+    .with("q", "apple")
+    .with("color", "red");
+write!(uart, "GET /search{qs} HTTP/1.1\r\n")?;
+```
+
 ## Owned builder
 
 If you want to store the query string in a struct or return it from a function
 without dealing with lifetimes, use `QueryStringOwned` — the same API, but it
-eagerly converts keys and values to owned `String`s:
+percent-encodes keys and values eagerly into a single internal buffer. Pre-size
+it with `with_capacity` to build with exactly one allocation, and take the
+result with `as_str()` or `into_string()` without formatting or copying:
 
 ```rust
 use query_string_builder::QueryStringOwned;
@@ -48,6 +105,16 @@ fn build_query() -> QueryStringOwned {
         .with("q", "apple")
         .with("answer", 42)
 }
+```
+
+```rust
+use query_string_builder::QueryStringOwned;
+
+let url = QueryStringOwned::with_capacity(64)
+    .with("q", "apple")
+    .with("answer", 42)
+    .into_string();
+assert_eq!(url, "?q=apple&answer=42");
 ```
 
 A borrowing builder can also be converted with `qs.into_owned()`.

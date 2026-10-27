@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed (breaking)
+
+- `QueryStringOwned` now percent-encodes keys and values eagerly into a single
+  internal `String` buffer instead of storing a `String` per key and value.
+  Building allocates only that buffer (amortized), and rendering is a single
+  `write_str`.
+- `QueryStringOwned::with`, `with_opt`, `push` and `push_opt` now take
+  `K: Display, V: Display` instead of `ToString`. Every type with a blanket
+  `ToString` implementation is still accepted.
+- `QueryStringOwned` equality now compares the encoded query string.
+- `QueryStringOwned`'s `Debug` output now shows the encoded buffer.
+- `with`, `with_opt` and `append_into` are `#[must_use]` on both builders.
+- `QueryString::append` and `append_into` accept builders with any storage
+  type.
+
+### Added
+
+- The crate is `#![no_std]`. The new default `alloc` feature gates
+  `QueryStringOwned`, the `Vec`-backed default storage and the
+  `String`-rendering helpers (`into_owned`, `write_into`). Without it,
+  `QueryString::with_storage` on `InlinePairs` builds and renders into any
+  `core::fmt::Write` sink. `percent-encoding` is used without its `std`
+  feature.
+- `QueryString<'a, S = Vec<Pair<'a>>>` is generic over its pair storage.
+  `QueryString::inline::<N>()` keeps up to `N` pairs inline (`InlinePairs`)
+  for building and rendering without any heap allocation;
+  `QueryString::with_storage` accepts any `PairStorage` implementation, so
+  collections such as `heapless::Vec` can be plugged in.
+  `QueryString::with_capacity` pre-sizes the default `Vec` storage.
+- `QueryString::try_with` and `try_push` return `CapacityError` instead of
+  panicking when fixed-capacity storage is full.
+- `QueryString::encoded_len` returns the exact rendered length without
+  allocating; `Display` values are formatted into a byte counter.
+- `Part` implements `Debug`, formatting like a string literal.
+- `QueryString::write_into` appends the rendered query string to a `String`
+  with a single exact reservation, e.g. onto a base URL.
+- `QueryStringOwned::with_capacity` and `capacity` for building without
+  reallocations.
+- `QueryStringOwned::as_str` and `into_string` (plus `AsRef<str>` and
+  `From<QueryStringOwned> for String`) to access the rendered query string
+  without formatting or copying.
+- `QueryStringOwned` implements `Hash`; `QueryString::new` and
+  `QueryStringOwned::new` are `const`.
+
+### Internal
+
+- `QueryString::into_owned` renders once into a buffer sized exactly up
+  front, so it allocates once regardless of the value types.
+- `QueryString`'s `Debug` implementation no longer allocates a `String` per
+  key and value; the output is unchanged.
+- CI and `task check:no-std` verify `no_std` builds on a bare-metal target
+  (`riscv32imc-unknown-none-elf`) with and without `alloc`.
+- New allocation-count tests (`tests/allocations.rs`) verify the
+  zero-allocation claims, including heap-free inline building and rendering.
+
 ## [0.7.1] - 2026-06-05
 
 [0.7.1]: https://github.com/sunsided/query-string-builder/releases/tag/v0.7.1
