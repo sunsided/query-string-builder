@@ -87,6 +87,12 @@ pub use borrowed::{IntoPart, Part, QueryString};
 pub use owned::QueryStringOwned;
 pub use storage::{CapacityError, InlinePairs, Pair, PairStorage};
 
+// Runs the README's code blocks as doctests so they cannot drift from the API.
+// They use the `Vec`-backed builder and `QueryStringOwned`, hence `alloc`.
+#[doc = include_str!("../README.md")]
+#[cfg(all(doctest, feature = "alloc"))]
+pub struct ReadmeDoctests;
+
 /// https://url.spec.whatwg.org/#query-percent-encode-set
 pub(crate) const QUERY: &AsciiSet = &CONTROLS
     .add(b' ')

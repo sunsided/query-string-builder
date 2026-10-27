@@ -10,8 +10,9 @@ The initial `?` question mark is automatically prepended.
 ## Example
 
 `QueryString` borrows its keys and values and allocates **no strings at all** —
-neither while building nor while rendering. Only the pair list itself is a
-single `Vec` allocation (see below to avoid even that):
+neither while building nor while rendering. The only heap memory is the `Vec`
+holding the pairs; size it up front with `QueryString::with_capacity(n)` to
+make that a single allocation, or see below to avoid the heap entirely:
 
 ```rust
 use query_string_builder::QueryString;
@@ -72,30 +73,38 @@ plugged in by implementing `PairStorage` and passing it to
 ## `no_std`
 
 The crate is `#![no_std]`. Its default `alloc` feature provides
-`QueryStringOwned` and the `Vec`-backed storage; disable default features to
-use it on targets without an allocator, building on `InlinePairs` and rendering
-into any `core::fmt::Write` sink:
+`QueryStringOwned`, the `Vec`-backed storage and the `String` helpers
+(`into_owned`, `write_into`); disable default features to use it on targets
+without an allocator, building on `InlinePairs` and rendering into any
+`core::fmt::Write` sink:
 
 ```toml
 query-string-builder = { version = "0.8", default-features = false }
 ```
 
-```rust,ignore
+```rust
+use core::fmt::{self, Write};
 use query_string_builder::{InlinePairs, QueryString};
 
-let qs = QueryString::with_storage(InlinePairs::<2>::new())
-    .with("q", "apple")
-    .with("color", "red");
-write!(uart, "GET /search{qs} HTTP/1.1\r\n")?;
+fn write_search_path(out: &mut impl Write) -> fmt::Result {
+    let qs = QueryString::with_storage(InlinePairs::<2>::new())
+        .with("q", "apple")
+        .with("color", "red");
+    write!(out, "/search{qs}")
+}
+# let mut out = String::new();
+# write_search_path(&mut out).unwrap();
+# assert_eq!(out, "/search?q=apple&color=red");
 ```
 
 ## Owned builder
 
 If you want to store the query string in a struct or return it from a function
-without dealing with lifetimes, use `QueryStringOwned` — the same API, but it
-percent-encodes keys and values eagerly into a single internal buffer. Pre-size
-it with `with_capacity` to build with exactly one allocation, and take the
-result with `as_str()` or `into_string()` without formatting or copying:
+without dealing with lifetimes, use `QueryStringOwned`. It shares the
+`with`/`with_opt`/`push`/`push_opt`/`append` methods but takes keys and values
+by value and percent-encodes them eagerly into a single internal buffer.
+Pre-size it with `with_capacity` to build with exactly one allocation, and take
+the result with `as_str()` or `into_string()` without formatting or copying:
 
 ```rust
 use query_string_builder::QueryStringOwned;
@@ -124,14 +133,19 @@ A borrowing builder can also be converted with `qs.into_owned()`.
 Because `QueryString` borrows its values, inline temporaries don't live long
 enough — bind them to a variable first:
 
-```rust,ignore
+```rust,compile_fail
+use query_string_builder::QueryString;
+
 // Does not compile: the String temporary is dropped at the end of the statement.
 let qs = QueryString::new().with("answer", &42.to_string());
 println!("{qs}");
 ```
 
-```rust,ignore
+```rust
+use query_string_builder::QueryString;
+
 // Bind first instead:
 let answer = 42.to_string();
 let qs = QueryString::new().with("answer", &answer);
+assert_eq!(qs.to_string(), "?answer=42");
 ```
