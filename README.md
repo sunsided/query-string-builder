@@ -11,7 +11,7 @@ The initial `?` question mark is automatically prepended.
 
 `QueryString` borrows its keys and values and allocates **no strings at all** —
 neither while building nor while rendering. Only the pair list itself is a
-single `Vec` allocation:
+single `Vec` allocation (see below to avoid even that):
 
 ```rust
 use query_string_builder::QueryString;
@@ -33,6 +33,27 @@ fn main() {
     );
 }
 ```
+
+## No heap at all
+
+The borrowing builder can keep its pairs inline instead of in a `Vec`.
+`QueryString::inline::<N>()` holds up to `N` pairs without touching the heap;
+`try_with`/`try_push` report a full builder instead of panicking:
+
+```rust
+use query_string_builder::QueryString;
+
+let answer = 42;
+let qs = QueryString::inline::<2>()
+    .with("q", "apple")
+    .with("answer", &answer);
+
+assert_eq!(qs.to_string(), "?q=apple&answer=42");
+```
+
+Any other collection — e.g. `heapless::Vec` or `arrayvec::ArrayVec` — can be
+plugged in by implementing `PairStorage` and passing it to
+`QueryString::with_storage`.
 
 ## Owned builder
 

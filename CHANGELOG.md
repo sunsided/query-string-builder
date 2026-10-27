@@ -16,23 +16,34 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `ToString` implementation is still accepted.
 - `QueryStringOwned` equality now compares the encoded query string.
 - `QueryStringOwned`'s `Debug` output now shows the encoded buffer.
-- `QueryStringOwned::with`, `with_opt` and `append_into` are `#[must_use]`.
+- `with`, `with_opt` and `append_into` are `#[must_use]` on both builders.
+- `QueryString::append` and `append_into` accept builders with any storage
+  type.
 
 ### Added
 
+- `QueryString<'a, S = Vec<Pair<'a>>>` is generic over its pair storage.
+  `QueryString::inline::<N>()` keeps up to `N` pairs inline (`InlinePairs`)
+  for building and rendering without any heap allocation;
+  `QueryString::with_storage` accepts any `PairStorage` implementation, so
+  collections such as `heapless::Vec` can be plugged in.
+  `QueryString::with_capacity` pre-sizes the default `Vec` storage.
+- `QueryString::try_with` and `try_push` return `CapacityError` instead of
+  panicking when fixed-capacity storage is full.
 - `QueryStringOwned::with_capacity` and `capacity` for building without
   reallocations.
 - `QueryStringOwned::as_str` and `into_string` (plus `AsRef<str>` and
   `From<QueryStringOwned> for String`) to access the rendered query string
   without formatting or copying.
-- `QueryStringOwned` implements `Hash`; `QueryStringOwned::new` is `const`.
+- `QueryStringOwned` implements `Hash`; `QueryString::new` and
+  `QueryStringOwned::new` are `const`.
 
 ### Internal
 
 - `QueryString::into_owned` renders once into a buffer sized up front;
   builders consisting only of `&str` parts convert with a single allocation.
 - New allocation-count tests (`tests/allocations.rs`) verify the
-  zero-allocation claims.
+  zero-allocation claims, including heap-free inline building and rendering.
 
 ## [0.7.1] - 2026-06-05
 

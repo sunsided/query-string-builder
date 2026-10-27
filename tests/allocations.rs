@@ -116,3 +116,35 @@ fn borrowed_into_owned_renders_once() {
     assert_eq!(allocations, 1, "string slices are sized exactly up front");
     assert_eq!(owned.len(), 2);
 }
+
+#[test]
+fn borrowed_inline_never_allocates() {
+    let answer = 42;
+    let mut out = String::with_capacity(64);
+
+    let (qs, allocations) = count(|| {
+        QueryString::inline::<3>()
+            .with("q", "🍎 apple")
+            .with("answer", &answer)
+            .with_opt("color", None::<&str>)
+    });
+    assert_eq!(allocations, 0, "building with inline storage");
+
+    let ((), allocations) = count(|| write!(out, "{qs}").unwrap());
+    assert_eq!(allocations, 0, "rendering with inline storage");
+    assert_eq!(out, "?q=%F0%9F%8D%8E%20apple&answer=42");
+}
+
+#[test]
+fn borrowed_with_capacity_builds_with_one_allocation() {
+    let answer = 42;
+    let (qs, allocations) = count(|| {
+        QueryString::with_capacity(4)
+            .with("q", "🍎 apple")
+            .with("answer", &answer)
+            .with("a", "1")
+            .with("b", "2")
+    });
+    assert_eq!(allocations, 1, "only the up-front pair allocation");
+    assert_eq!(qs.len(), 4);
+}

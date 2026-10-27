@@ -50,11 +50,13 @@
 mod borrowed;
 mod encode;
 mod owned;
+mod storage;
 
 use percent_encoding::{AsciiSet, CONTROLS};
 
 pub use borrowed::{IntoPart, Part, QueryString};
 pub use owned::QueryStringOwned;
+pub use storage::{CapacityError, InlinePairs, Pair, PairStorage};
 
 /// https://url.spec.whatwg.org/#query-percent-encode-set
 pub(crate) const QUERY: &AsciiSet = &CONTROLS

@@ -82,16 +82,20 @@ proptest! {
         prop_assert_eq!(decoded, pairs);
     }
 
-    /// Borrowed and owned builders render identically; `into_owned` preserves output.
+    /// Vec-backed, inline and owned builders render identically; `into_owned`
+    /// preserves output.
     #[test]
     fn owned_borrowed_equivalence(pairs in pairs()) {
         let mut borrowed = QueryString::new();
+        let mut inline = QueryString::inline::<8>();
         let mut owned = QueryStringOwned::new();
         for (key, value) in &pairs {
             borrowed.push(key.as_str(), value.as_str());
+            inline.push(key.as_str(), value.as_str());
             owned.push(key, value);
         }
         let rendered = borrowed.to_string();
+        prop_assert_eq!(&rendered, &inline.to_string());
         prop_assert_eq!(&rendered, &owned.to_string());
         prop_assert_eq!(&rendered, &borrowed.into_owned().to_string());
     }
