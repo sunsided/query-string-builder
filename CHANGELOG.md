@@ -3,7 +3,9 @@
 All notable changes to this project will be documented in this file.
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.8.0] - 2026-10-28
+
+[0.8.0]: https://github.com/sunsided/query-string-builder/releases/tag/v0.8.0
 
 ### Changed (breaking)
 
@@ -59,6 +61,20 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`riscv32imc-unknown-none-elf`) with and without `alloc`.
 - New allocation-count tests (`tests/allocations.rs`) verify the
   zero-allocation claims, including heap-free inline building and rendering.
+- The README's code examples run as doctests.
+- GitHub Actions are pinned to commit SHAs with least-privilege permissions,
+  and Dependabot keeps actions and Cargo dependencies current with a 7-day
+  cooldown.
+- `criterion` was upgraded to 0.8.
+
+### Migration
+
+- `QueryStringOwned` methods take `Display` values; types that only
+  implemented `ToString` manually need a `Display` implementation.
+- Code relying on `QueryStringOwned`'s `Debug` output or comparing it with
+  `==` now sees the encoded query string.
+- For `no_std` without an allocator, disable default features and build on
+  `QueryString::with_storage(InlinePairs::<N>::new())`.
 
 ## [0.7.1] - 2026-06-05
 

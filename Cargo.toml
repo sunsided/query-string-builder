@@ -2,7 +2,7 @@
 name = "query-string-builder"
 description = "A query string builder for percent encoding key-value pairs"
 authors = ["Markus Mayer"]
-version = "0.7.1"
+version = "0.8.0"
 edition = "2024"
 rust-version = "1.87"
 repository = "https://github.com/sunsided/query-string-builder"
