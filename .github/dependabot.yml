@@ -21,8 +21,10 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    # Dependabot does not tell Cargo dev-dependencies apart, so group the
+    # test and benchmark tooling by name; everything else falls through.
     groups:
       cargo-dev-dependencies:
-        dependency-type: development
+        patterns: ["criterion", "proptest"]
       cargo-dependencies:
-        dependency-type: production
+        patterns: ["*"]
